@@ -2,6 +2,7 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteRule ^(app|config|database|scripts|wordpress-plugin)(/|$) - [F,L]
     RewriteRule ^$ public/index.php [L]
     RewriteRule ^login/?$ public/login.php [L]
     RewriteRule ^logout/?$ public/logout.php [L]

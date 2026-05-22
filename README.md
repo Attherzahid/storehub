@@ -56,3 +56,7 @@ Create a matching row in `store_connections` with `SHA2('your-token', 256)` and 
 - Secret keys are never rendered in frontend responses.
 
 For production Stripe verification, install `stripe/stripe-php` with Composer and replace `api/stripe-verify.php` with a server-side Account API call.
+
+## Namecheap Deployment
+
+See `NAMECHEAP_DEPLOY.md` for the cPanel Git deployment steps.

@@ -3,4 +3,6 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/orpiemma/storehub.orpixia.com/
     - /bin/mkdir -p $DEPLOYPATH
-    - /bin/rsync -a --delete --exclude='.git' --exclude='.cpanel.yml' ./ $DEPLOYPATH
+    - /bin/rsync -a --delete --exclude='.git' --exclude='.cpanel.yml' --exclude='config/config.php' --exclude='config/config copy.php' ./ $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/config
+    - /bin/cp -n config/production.example.php $DEPLOYPATH/config/config.php

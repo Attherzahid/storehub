@@ -1,4 +1,4 @@
-USE store_hub;
+USE orpiemma_storehub;
 
 INSERT INTO users (name, email, password_hash, role) VALUES
 ('Avery Stone', 'ameerhamzadeveloper@gmail.com', '$2y$10$APoNpEb7C1nlf.Og.IkaseqR99yH0Ny9sEarr0pgpa8VLOemy8DNCX', 'admin');
