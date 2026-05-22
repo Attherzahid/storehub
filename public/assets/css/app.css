@@ -213,6 +213,19 @@ input:focus, select:focus { border-color: var(--brand); }
     background: rgba(255, 255, 255, .04);
 }
 .store-history-summary strong { color: var(--text); }
+.sync-note {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 16px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgba(73, 211, 255, .08);
+}
+.sync-note i { color: var(--brand); margin-top: 3px; }
+.sync-note strong { display: block; margin-bottom: 4px; }
+.sync-note p { margin: 0; color: var(--muted); }
 .toast-stack { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 10px; z-index: 80; }
 .toast { padding: 12px 14px; border-radius: var(--radius); background: var(--panel-strong); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .alert { padding: 12px; border-radius: var(--radius); }

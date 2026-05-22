@@ -44,15 +44,15 @@ $keys = StripeKey::all();
             <label>Name<input name="name" required></label>
             <label>Domain<input name="domain" required></label>
             <label>Stripe key<select name="stripe_key_id"><option value="">Unassigned</option><?php foreach ($keys as $key): ?><option value="<?= (int) $key['id'] ?>"><?= e($key['company_name']) ?></option><?php endforeach; ?></select></label>
-            <label>Total sales<input name="total_sales" type="number" step="0.01"></label>
-            <label>Monthly sales<input name="monthly_sales" type="number" step="0.01"></label>
             <label>Currency<input name="currency" value="USD"></label>
-            <label>Order count<input name="order_count" type="number"></label>
-            <label>Average order<input name="average_order_value" type="number" step="0.01"></label>
             <label>Status<select name="status"><option>active</option><option>disabled</option><option>syncing</option></select></label>
-            <label>Last sync<input name="last_sync_at" type="datetime-local"></label>
-            <label>WooCommerce version<input name="woocommerce_version"></label>
-            <label>WordPress version<input name="wordpress_version"></label>
+        </div>
+        <div class="sync-note">
+            <i class="fa-solid fa-rotate"></i>
+            <div>
+                <strong>Analytics sync automatically</strong>
+                <p>Total sales, monthly sales, orders, average order value, WooCommerce version, WordPress version, and last sync time are filled by the WordPress plugin.</p>
+            </div>
         </div>
         <div class="modal-actions"><button type="button" class="btn ghost" data-close-modal>Cancel</button><button class="btn primary">Save store</button></div>
     </form>
