@@ -22,7 +22,7 @@ $keys = StripeKey::all($_GET['search'] ?? null);
                 <p><?= e($key['country_flag']) ?> <?= e($key['country_name']) ?> · <?= e($key['payout_timing']) ?></p>
                 <div class="data-stats"><span>Volume <strong>$<?= number_format((float) $key['total_processed_volume'], 2) ?></strong></span><span>Stores <strong><?= e($key['connected_stores'] ?: 'None') ?></strong></span></div>
                 <div class="row-actions">
-                    <button class="btn ghost" data-details='<?= e(json_encode($key)) ?>'>More details</button>
+                    <a class="btn ghost" href="index.php?page=key-details&id=<?= (int) $key['id'] ?>">More details</a>
                     <button class="btn ghost" data-edit='<?= e(json_encode($key)) ?>'>Edit</button>
                     <button class="btn danger" data-delete="stripe-key" data-id="<?= (int) $key['id'] ?>">Delete</button>
                 </div>

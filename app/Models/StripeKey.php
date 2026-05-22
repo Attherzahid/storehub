@@ -74,4 +74,82 @@ final class StripeKey
     {
         db()->prepare('DELETE FROM stripe_keys WHERE id=?')->execute([$id]);
     }
+
+    public static function details(int $id): ?array
+    {
+        $keyStmt = db()->prepare('SELECT id, company_name, email, phone, country_name, country_flag, account_age, payout_timing, last_payout_date, total_processed_volume, status, created_at FROM stripe_keys WHERE id = ? LIMIT 1');
+        $keyStmt->execute([$id]);
+        $key = $keyStmt->fetch();
+        if (!$key) {
+            return null;
+        }
+
+        $storesStmt = db()->prepare("
+            SELECT
+                s.id,
+                s.name,
+                s.domain,
+                s.currency,
+                s.status,
+                s.last_sync_at,
+                COUNT(t.id) transaction_count,
+                COALESCE(SUM(CASE WHEN t.status = 'succeeded' THEN t.amount ELSE 0 END), 0) successful_amount,
+                COALESCE(SUM(t.amount), 0) total_amount,
+                COALESCE(SUM(CASE WHEN t.status = 'failed' THEN 1 ELSE 0 END), 0) failed_count,
+                COALESCE(SUM(CASE WHEN t.status = 'refunded' THEN 1 ELSE 0 END), 0) refund_count
+            FROM stores s
+            LEFT JOIN transactions t ON t.store_id = s.id
+            WHERE s.stripe_key_id = ?
+            GROUP BY s.id, s.name, s.domain, s.currency, s.status, s.last_sync_at
+            ORDER BY successful_amount DESC, s.name ASC
+        ");
+        $storesStmt->execute([$id]);
+        $stores = $storesStmt->fetchAll();
+
+        $summaryStmt = db()->prepare("
+            SELECT
+                COUNT(t.id) transaction_count,
+                COALESCE(SUM(CASE WHEN t.status = 'succeeded' THEN t.amount ELSE 0 END), 0) successful_amount,
+                COALESCE(SUM(CASE WHEN t.status = 'failed' THEN 1 ELSE 0 END), 0) failed_count,
+                COALESCE(SUM(CASE WHEN t.status = 'refunded' THEN 1 ELSE 0 END), 0) refund_count,
+                COALESCE(SUM(CASE WHEN t.status = 'succeeded' THEN 1 ELSE 0 END), 0) success_count
+            FROM transactions t
+            LEFT JOIN stores s ON s.id = t.store_id
+            WHERE t.stripe_key_id = ? OR s.stripe_key_id = ?
+        ");
+        $summaryStmt->execute([$id, $id]);
+        $summary = $summaryStmt->fetch();
+
+        $transactionsStmt = db()->prepare("
+            SELECT t.id, t.store_id, t.stripe_transaction_id, t.customer_email, t.amount, t.currency, t.status, t.created_at, s.name store_name
+            FROM transactions t
+            LEFT JOIN stores s ON s.id = t.store_id
+            WHERE t.stripe_key_id = ? OR s.stripe_key_id = ?
+            ORDER BY t.created_at DESC
+            LIMIT 100
+        ");
+        $transactionsStmt->execute([$id, $id]);
+        $transactions = $transactionsStmt->fetchAll();
+
+        $payoutsStmt = db()->prepare('SELECT amount, currency, payout_date, status FROM payouts WHERE stripe_key_id = ? ORDER BY payout_date DESC LIMIT 20');
+        $payoutsStmt->execute([$id]);
+
+        $transactionCount = (int) ($summary['transaction_count'] ?? 0);
+        $successCount = (int) ($summary['success_count'] ?? 0);
+
+        return [
+            'key' => $key,
+            'summary' => [
+                'connected_store_count' => count($stores),
+                'transaction_count' => $transactionCount,
+                'successful_amount' => (float) ($summary['successful_amount'] ?? 0),
+                'failed_count' => (int) ($summary['failed_count'] ?? 0),
+                'refund_count' => (int) ($summary['refund_count'] ?? 0),
+                'success_rate' => $transactionCount > 0 ? round(($successCount / $transactionCount) * 100, 1) : 0,
+            ],
+            'stores' => $stores,
+            'transactions' => $transactions,
+            'payouts' => $payoutsStmt->fetchAll(),
+        ];
+    }
 }

@@ -7,6 +7,7 @@ $items = [
     'analytics' => ['Analytics', 'fa-chart-line'],
     'settings' => ['Settings', 'fa-gear'],
 ];
+$activePage = ($currentPage ?? '') === 'key-details' ? 'keys' : ($currentPage ?? '');
 ?>
 <aside class="sidebar" id="sidebar">
     <a href="index.php" class="logo">
@@ -15,7 +16,7 @@ $items = [
     </a>
     <nav class="nav-menu">
         <?php foreach ($items as $key => [$label, $icon]): ?>
-            <a class="nav-link <?= ($currentPage ?? '') === $key ? 'active' : '' ?>" href="index.php?page=<?= e($key) ?>">
+            <a class="nav-link <?= $activePage === $key ? 'active' : '' ?>" href="index.php?page=<?= e($key) ?>">
                 <i class="fa-solid <?= e($icon) ?>"></i><span><?= e($label) ?></span>
             </a>
         <?php endforeach; ?>

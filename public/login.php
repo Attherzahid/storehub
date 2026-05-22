@@ -46,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($error): ?><div class="alert danger"><?= e($error) ?></div><?php endif; ?>
         <form method="post" class="stack">
             <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
-            <label>Email<input name="email" type="email" value="admin@storehub.local" required></label>
-            <label>Password<input name="password" type="password" value="password" required></label>
+            <label>Email<input name="email" type="email" required></label>
+            <label>Password<input name="password" type="password" required></label>
             <button class="btn primary" type="submit">Sign in</button>
         </form>
     </main>

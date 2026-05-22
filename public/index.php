@@ -6,7 +6,7 @@ require __DIR__ . '/bootstrap.php';
 require_auth();
 
 $page = $_GET['page'] ?? 'dashboard';
-$allowed = ['dashboard', 'keys', 'stores', 'analytics', 'settings'];
+$allowed = ['dashboard', 'keys', 'key-details', 'stores', 'analytics', 'settings'];
 
 if (!in_array($page, $allowed, true)) {
     http_response_code(404);
