@@ -42,7 +42,7 @@ Copy `wordpress-plugin/store-hub-bridge` into `wp-content/plugins/`, activate **
 Use this dashboard endpoint:
 
 ```text
-http://localhost/store-hub/api/store-sync.php
+https://storehub.orpixia.com/api/store-sync.php
 ```
 
 Create a matching row in `store_connections` with `SHA2('your-token', 256)` and paste the plain token into the plugin settings.

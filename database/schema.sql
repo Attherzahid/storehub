@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS store_hub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE store_hub;
+CREATE DATABASE IF NOT EXISTS orpiemma_storehub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE orpiemma_storehub;
 
 CREATE TABLE users (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

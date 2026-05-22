@@ -86,7 +86,7 @@ document.querySelectorAll('[data-ajax-form]').forEach(form => {
         const resource = form.dataset.ajaxForm;
         const payload = Object.fromEntries(new FormData(form).entries());
         const method = payload.id ? 'PUT' : 'POST';
-        const response = await fetch(`../api/${resource}.php`, {
+        const response = await fetch(`api/${resource}.php`, {
             method,
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify(payload)
@@ -100,7 +100,7 @@ document.querySelectorAll('[data-ajax-form]').forEach(form => {
 document.querySelectorAll('[data-delete]').forEach(button => {
     button.addEventListener('click', async () => {
         if (!confirm('Delete this record?')) return;
-        const response = await fetch(`../api/${button.dataset.delete}.php`, {
+        const response = await fetch(`api/${button.dataset.delete}.php`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify({ id: button.dataset.id })
@@ -114,7 +114,7 @@ document.querySelectorAll('[data-delete]').forEach(button => {
 document.querySelectorAll('[data-export]').forEach(button => {
     button.addEventListener('click', () => {
         if (button.dataset.export === 'csv') {
-            location.href = '../api/export.php?type=csv';
+            location.href = 'api/export.php?type=csv';
             return;
         }
         window.print();
@@ -122,12 +122,12 @@ document.querySelectorAll('[data-export]').forEach(button => {
 });
 
 document.getElementById('refreshDashboard')?.addEventListener('click', async () => {
-    const response = await fetch('../api/analytics.php');
+    const response = await fetch('api/analytics.php');
     if (response.ok) toast('Live dashboard data refreshed');
 });
 
 setInterval(() => {
     if (document.visibilityState === 'visible') {
-        fetch('../api/analytics.php').catch(() => {});
+        fetch('api/analytics.php').catch(() => {});
     }
 }, 60000);
