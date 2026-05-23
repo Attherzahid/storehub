@@ -28,7 +28,7 @@ $keys = StripeKey::all();
                         <td><?= e($store['stripe_company'] ?: 'Unassigned') ?></td>
                         <td><span class="status <?= e($store['status']) ?>"><?= e($store['status']) ?></span></td>
                         <td><?= e($store['last_sync_at']) ?></td>
-                        <td class="row-actions"><button class="btn ghost" data-edit='<?= e(json_encode($store)) ?>'>Edit</button><button class="btn danger" data-delete="store" data-id="<?= (int) $store['id'] ?>">Delete</button></td>
+                        <td class="row-actions"><button class="btn ghost" data-store-token="<?= (int) $store['id'] ?>">Token</button><button class="btn ghost" data-edit='<?= e(json_encode($store)) ?>'>Edit</button><button class="btn danger" data-delete="store" data-id="<?= (int) $store['id'] ?>">Delete</button></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -56,4 +56,19 @@ $keys = StripeKey::all();
         </div>
         <div class="modal-actions"><button type="button" class="btn ghost" data-close-modal>Cancel</button><button class="btn primary">Save store</button></div>
     </form>
+</dialog>
+<dialog class="modal" id="tokenModal">
+    <div class="modal-card">
+        <h2>Store API token</h2>
+        <p>Paste this token into the WordPress plugin settings. For security, it is shown only once.</p>
+        <label>Token<input id="generatedStoreToken" readonly></label>
+        <div class="sync-note">
+            <i class="fa-solid fa-link"></i>
+            <div>
+                <strong>Plugin endpoint</strong>
+                <p><?= e(url('api/store-sync.php')) ?></p>
+            </div>
+        </div>
+        <div class="modal-actions"><button type="button" class="btn ghost" data-copy-token>Copy token</button><button type="button" class="btn primary" data-close-modal>Done</button></div>
+    </div>
 </dialog>

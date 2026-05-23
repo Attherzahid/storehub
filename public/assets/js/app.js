@@ -111,6 +111,32 @@ document.querySelectorAll('[data-delete]').forEach(button => {
     });
 });
 
+document.querySelectorAll('[data-store-token]').forEach(button => {
+    button.addEventListener('click', async () => {
+        const response = await fetch('api/store-token.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+            body: JSON.stringify({ store_id: button.dataset.storeToken })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            toast(result.error || 'Unable to generate token');
+            return;
+        }
+        const input = document.getElementById('generatedStoreToken');
+        input.value = result.token;
+        document.getElementById('tokenModal')?.showModal();
+        toast(result.message);
+    });
+});
+
+document.querySelector('[data-copy-token]')?.addEventListener('click', async () => {
+    const input = document.getElementById('generatedStoreToken');
+    input?.select();
+    await navigator.clipboard?.writeText(input?.value || '');
+    toast('Token copied');
+});
+
 document.querySelectorAll('[data-export]').forEach(button => {
     button.addEventListener('click', () => {
         if (button.dataset.export === 'csv') {

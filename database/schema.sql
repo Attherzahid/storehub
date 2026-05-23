@@ -103,4 +103,5 @@ CREATE TABLE store_connections (
     last_seen_at DATETIME NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_connections_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+    UNIQUE KEY uniq_connections_store (store_id)
 ) ENGINE=InnoDB;

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Store Hub Bridge
  * Description: Secure WooCommerce data bridge for the Store Hub admin dashboard.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Store Hub
  * Requires PHP: 8.0
  * Text Domain: store-hub-bridge
@@ -16,6 +16,7 @@ final class Store_Hub_Bridge
 {
     private const OPTION_ENDPOINT = 'store_hub_endpoint';
     private const OPTION_TOKEN = 'store_hub_token';
+    private const OPTION_LOGS = 'store_hub_sync_logs';
     private const CRON_HOOK = 'store_hub_sync_event';
 
     public function __construct()
@@ -67,8 +68,12 @@ final class Store_Hub_Bridge
             return;
         }
         if (isset($_POST['store_hub_sync_now']) && check_admin_referer('store_hub_sync_now')) {
-            $this->sync();
-            echo '<div class="notice notice-success"><p>Store Hub sync attempted. Check dashboard activity logs.</p></div>';
+            $result = $this->sync();
+            if ($result === true) {
+                echo '<div class="notice notice-success"><p>Store Hub sync completed.</p></div>';
+            } else {
+                echo '<div class="notice notice-error"><p>' . esc_html($result) . '</p></div>';
+            }
         }
         ?>
         <div class="wrap">
@@ -91,16 +96,23 @@ final class Store_Hub_Bridge
                 <?php wp_nonce_field('store_hub_sync_now'); ?>
                 <p><button class="button button-secondary" name="store_hub_sync_now" value="1">Sync now</button></p>
             </form>
+            <h2>Sync log</h2>
+            <?php $this->renderLogs(); ?>
         </div>
         <?php
     }
 
-    public function sync(): void
+    public function sync(): bool|string
     {
         $endpoint = esc_url_raw((string) get_option(self::OPTION_ENDPOINT));
         $token = sanitize_text_field((string) get_option(self::OPTION_TOKEN));
-        if (!$endpoint || !$token || !class_exists('WooCommerce')) {
-            return;
+        if (!$endpoint || !$token) {
+            $this->addLog('failed', 'Store Hub endpoint and API token are required.', $endpoint);
+            return 'Store Hub endpoint and API token are required.';
+        }
+        if (!class_exists('WooCommerce') || !function_exists('wc_get_orders')) {
+            $this->addLog('failed', 'WooCommerce is not active or its order functions are unavailable.', $endpoint);
+            return 'WooCommerce is not active or its order functions are unavailable.';
         }
 
         $orders = wc_get_orders([
@@ -112,8 +124,10 @@ final class Store_Hub_Bridge
 
         $payloadOrders = [];
         $monthlySales = 0.0;
+        $recentSales = 0.0;
         foreach ($orders as $order) {
             $total = (float) $order->get_total();
+            $recentSales += $order->is_paid() ? $total : 0;
             if ($order->get_date_created() && $order->get_date_created()->date('Y-m') === gmdate('Y-m')) {
                 $monthlySales += $total;
             }
@@ -127,12 +141,13 @@ final class Store_Hub_Bridge
             ];
         }
 
+        $orderCount = $this->countPaidOrders();
         $payload = [
             'summary' => [
-                'total_sales' => (float) wc_get_total_sales(),
+                'total_sales' => $this->totalSales($recentSales),
                 'monthly_sales' => $monthlySales,
-                'currency' => get_woocommerce_currency(),
-                'order_count' => wc_orders_count('completed') + wc_orders_count('processing'),
+                'currency' => function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : get_option('woocommerce_currency', 'USD'),
+                'order_count' => $orderCount,
                 'average_order_value' => count($orders) ? array_sum(array_column($payloadOrders, 'total')) / count($orders) : 0,
                 'woocommerce_version' => defined('WC_VERSION') ? WC_VERSION : '',
                 'wordpress_version' => get_bloginfo('version'),
@@ -140,7 +155,7 @@ final class Store_Hub_Bridge
             'orders' => $payloadOrders,
         ];
 
-        wp_remote_post($endpoint, [
+        $response = wp_remote_post($endpoint, [
             'timeout' => 20,
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -148,6 +163,124 @@ final class Store_Hub_Bridge
             ],
             'body' => wp_json_encode($payload),
         ]);
+
+        if (is_wp_error($response)) {
+            $this->addLog('failed', $response->get_error_message(), $endpoint);
+            return 'Store Hub sync failed: ' . $response->get_error_message();
+        }
+
+        $statusCode = (int) wp_remote_retrieve_response_code($response);
+        $body = (string) wp_remote_retrieve_body($response);
+        if ($statusCode < 200 || $statusCode >= 300) {
+            $this->addLog('failed', 'HTTP ' . $statusCode . ' - ' . $this->shortBody($body), $endpoint, $statusCode);
+            return 'Store Hub sync failed with HTTP status ' . $statusCode . '.';
+        }
+
+        $this->addLog('success', 'Synced ' . count($payloadOrders) . ' recent orders.', $endpoint, $statusCode);
+        return true;
+    }
+
+    private function renderLogs(): void
+    {
+        $logs = get_option(self::OPTION_LOGS, []);
+        if (!is_array($logs) || !$logs) {
+            echo '<p>No sync attempts logged yet.</p>';
+            return;
+        }
+        ?>
+        <table class="widefat striped">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Status</th>
+                    <th>HTTP</th>
+                    <th>Endpoint</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($logs as $log): ?>
+                    <tr>
+                        <td><?php echo esc_html($log['time'] ?? ''); ?></td>
+                        <td><?php echo esc_html($log['status'] ?? ''); ?></td>
+                        <td><?php echo esc_html((string) ($log['http_status'] ?? '')); ?></td>
+                        <td><code><?php echo esc_html($log['endpoint'] ?? ''); ?></code></td>
+                        <td><?php echo esc_html($log['message'] ?? ''); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php
+    }
+
+    private function addLog(string $status, string $message, string $endpoint = '', ?int $httpStatus = null): void
+    {
+        $logs = get_option(self::OPTION_LOGS, []);
+        if (!is_array($logs)) {
+            $logs = [];
+        }
+
+        array_unshift($logs, [
+            'time' => current_time('mysql'),
+            'status' => $status,
+            'http_status' => $httpStatus,
+            'endpoint' => $endpoint,
+            'message' => $message,
+        ]);
+
+        update_option(self::OPTION_LOGS, array_slice($logs, 0, 20), false);
+    }
+
+    private function shortBody(string $body): string
+    {
+        $body = trim(wp_strip_all_tags($body));
+        return strlen($body) > 180 ? substr($body, 0, 180) . '...' : $body;
+    }
+
+    private function totalSales(float $fallback): float
+    {
+        if (function_exists('wc_get_total_sales')) {
+            return (float) wc_get_total_sales();
+        }
+
+        $orders = wc_get_orders([
+            'limit' => 250,
+            'status' => $this->paidStatuses(),
+            'return' => 'objects',
+        ]);
+
+        if (!$orders) {
+            return $fallback;
+        }
+
+        $total = 0.0;
+        foreach ($orders as $order) {
+            $total += (float) $order->get_total();
+        }
+
+        return $total;
+    }
+
+    private function countPaidOrders(): int
+    {
+        if (function_exists('wc_orders_count')) {
+            return (int) wc_orders_count('completed') + (int) wc_orders_count('processing');
+        }
+
+        return count(wc_get_orders([
+            'limit' => 250,
+            'status' => $this->paidStatuses(),
+            'return' => 'ids',
+        ]));
+    }
+
+    private function paidStatuses(): array
+    {
+        if (function_exists('wc_get_is_paid_statuses')) {
+            return array_map(static fn (string $status): string => 'wc-' . $status, wc_get_is_paid_statuses());
+        }
+
+        return ['wc-processing', 'wc-completed'];
     }
 }
 
