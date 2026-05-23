@@ -1,5 +1,6 @@
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
 const palette = ['#49d3ff', '#8b5cf6', '#37d399', '#fbbf24', '#fb7185', '#22c55e', '#f472b6'];
+const chartInstances = {};
 
 function toast(message) {
     const node = document.createElement('div');
@@ -42,6 +43,211 @@ function chartConfig(canvas) {
 }
 
 document.querySelectorAll('canvas[data-chart]').forEach(canvas => new Chart(canvas, chartConfig(canvas)));
+
+function formatMoney(amount, currency = 'USD') {
+    return new Intl.NumberFormat('en', { style: 'currency', currency }).format(Number(amount || 0));
+}
+
+function formatLocalInput(date) {
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function html(value) {
+    return String(value ?? '').replace(/[&<>"']/g, match => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    }[match]));
+}
+
+function renderManagedChart(id, type, label, points) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    chartInstances[id]?.destroy();
+    chartInstances[id] = new Chart(canvas, {
+        type,
+        data: {
+            labels: points.map(point => point.label),
+            datasets: [{
+                label,
+                data: points.map(point => Number(point.value || 0)),
+                borderColor: '#49d3ff',
+                backgroundColor: type === 'doughnut' ? palette : 'rgba(73, 211, 255, .18)',
+                fill: type === 'line',
+                tension: .35,
+                borderWidth: 2,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#93a4bd' } } },
+            scales: type === 'doughnut' ? {} : {
+                x: { ticks: { color: '#93a4bd', maxRotation: 0 }, grid: { color: 'rgba(148,163,184,.12)' } },
+                y: { ticks: { color: '#93a4bd' }, grid: { color: 'rgba(148,163,184,.12)' } }
+            }
+        }
+    });
+}
+
+function paginateTable(table, pageSize = 20) {
+    if (!table || table.dataset.paginated === 'true') return;
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const visibleRows = () => rows.filter(row => row.dataset.filtered !== 'true');
+    if (visibleRows().length <= pageSize) return;
+
+    table.dataset.paginated = 'true';
+    let page = 1;
+    const controls = document.createElement('div');
+    controls.className = 'pagination';
+
+    const render = () => {
+        const activeRows = visibleRows();
+        const totalPages = Math.max(1, Math.ceil(activeRows.length / pageSize));
+        page = Math.min(page, totalPages);
+        const start = (page - 1) * pageSize;
+        const end = start + pageSize;
+        rows.forEach((row, index) => {
+            if (row.dataset.filtered === 'true') {
+                row.hidden = true;
+                return;
+            }
+            const visibleIndex = activeRows.indexOf(row);
+            row.hidden = visibleIndex < start || visibleIndex >= end;
+        });
+        controls.innerHTML = `
+            <button class="btn ghost" type="button" data-page-prev ${page === 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i>Prev</button>
+            <span>Page ${page} of ${totalPages}</span>
+            <button class="btn ghost" type="button" data-page-next ${page === totalPages ? 'disabled' : ''}>Next<i class="fa-solid fa-chevron-right"></i></button>
+        `;
+        controls.querySelector('[data-page-prev]')?.addEventListener('click', () => {
+            page = Math.max(1, page - 1);
+            render();
+        });
+        controls.querySelector('[data-page-next]')?.addEventListener('click', () => {
+            page = Math.min(totalPages, page + 1);
+            render();
+        });
+    };
+
+    table.closest('.table-wrap')?.after(controls);
+    table._renderPagination = render;
+    render();
+}
+
+function paginateTables(scope = document) {
+    scope.querySelectorAll('table').forEach(table => paginateTable(table, 20));
+}
+
+async function loadAnalytics() {
+    const form = document.getElementById('analyticsFilters');
+    if (!form) return;
+    const params = new URLSearchParams(new FormData(form));
+    const response = await fetch(`api/analytics.php?${params.toString()}`);
+    const data = await response.json();
+    if (!response.ok) {
+        toast(data.error || 'Unable to load analytics');
+        return;
+    }
+
+    const metrics = document.getElementById('analyticsMetrics');
+    metrics.innerHTML = `
+        <article class="metric-card"><span>Revenue</span><strong>${formatMoney(data.metrics.revenue)}</strong><i class="fa-solid fa-dollar-sign"></i></article>
+        <article class="metric-card"><span>Transactions</span><strong>${Number(data.metrics.transaction_count || 0).toLocaleString()}</strong><i class="fa-solid fa-receipt"></i></article>
+        <article class="metric-card"><span>Average order</span><strong>${formatMoney(data.metrics.average_order_value)}</strong><i class="fa-solid fa-basket-shopping"></i></article>
+        <article class="metric-card"><span>Success rate</span><strong>${data.metrics.success_rate}%</strong><i class="fa-solid fa-shield-halved"></i></article>
+        <article class="metric-card danger"><span>Failed / refunds</span><strong>${data.metrics.failed_count} / ${data.metrics.refund_count}</strong><i class="fa-solid fa-triangle-exclamation"></i></article>
+    `;
+
+    renderManagedChart('analyticsRevenueChart', 'line', 'Revenue', data.charts.revenueTrend || []);
+    renderManagedChart('analyticsStoreChart', 'bar', 'Store revenue', data.charts.storeSales || []);
+    renderManagedChart('analyticsStatusChart', 'doughnut', 'Payments', data.charts.statuses || []);
+
+    document.getElementById('analyticsInsights').innerHTML = `
+        <div class="list-row"><span>Best store</span><strong>${html(data.charts.storeSales?.[0]?.label || 'No data')}</strong></div>
+        <div class="list-row"><span>Peak point</span><strong>${html(data.charts.revenueTrend?.at(-1)?.label || 'No data')}</strong></div>
+        <div class="list-row"><span>Success rate</span><strong>${data.metrics.success_rate}%</strong></div>
+    `;
+
+    const rows = data.transactions || [];
+    document.getElementById('analyticsTransactions').innerHTML = rows.length ? rows.map(tx => `
+        <tr>
+            <td>${html(tx.store_name || 'Unassigned')}</td>
+            <td>${html(tx.customer_email || 'Unknown')}</td>
+            <td>${html(tx.currency || 'USD')} ${Number(tx.amount || 0).toFixed(2)}</td>
+            <td><span class="status ${html(tx.status)}">${html(tx.status)}</span></td>
+            <td>${html(tx.created_at)}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="5"><small>No transactions found for this range.</small></td></tr>';
+    const analyticsTable = document.getElementById('analyticsTransactions')?.closest('table');
+    analyticsTable?.removeAttribute('data-paginated');
+    analyticsTable?.closest('.table-wrap')?.nextElementSibling?.classList.contains('pagination') && analyticsTable.closest('.table-wrap').nextElementSibling.remove();
+    paginateTable(analyticsTable, 20);
+    applyTransactionStatusFilter();
+}
+
+function applyAnalyticsPreset(preset) {
+    const form = document.getElementById('analyticsFilters');
+    if (!form) return;
+    const to = new Date();
+    const from = new Date(to);
+    const hours = { '1h': 1, '6h': 6, '24h': 24, '7d': 168, '30d': 720 }[preset] || 24;
+    from.setHours(from.getHours() - hours);
+    form.elements.from.value = formatLocalInput(from);
+    form.elements.to.value = formatLocalInput(to);
+    loadAnalytics();
+}
+
+document.getElementById('analyticsFilters')?.addEventListener('submit', event => {
+    event.preventDefault();
+    loadAnalytics();
+});
+
+document.querySelectorAll('[data-preset]').forEach(button => {
+    button.addEventListener('click', () => applyAnalyticsPreset(button.dataset.preset));
+});
+
+function applyTransactionStatusFilter() {
+    const group = document.querySelector('[data-status-filter]');
+    const tbody = document.getElementById('analyticsTransactions');
+    const table = tbody?.closest('table');
+    if (!group || !tbody || !table) return;
+
+    const active = group.querySelector('.active')?.dataset.status || 'all';
+    tbody.querySelectorAll('tr').forEach(row => {
+        const status = row.querySelector('.status')?.textContent?.trim() || '';
+        row.dataset.filtered = active !== 'all' && status !== active ? 'true' : 'false';
+    });
+
+    table.removeAttribute('data-paginated');
+    table.closest('.table-wrap')?.nextElementSibling?.classList.contains('pagination') && table.closest('.table-wrap').nextElementSibling.remove();
+    tbody.querySelectorAll('tr').forEach(row => {
+        row.hidden = row.dataset.filtered === 'true';
+    });
+    paginateTable(table, 20);
+}
+
+document.querySelectorAll('[data-status-filter] button').forEach(button => {
+    button.addEventListener('click', () => {
+        const group = button.closest('[data-status-filter]');
+        group.querySelectorAll('button').forEach(item => item.classList.remove('active'));
+        button.classList.add('active');
+        applyTransactionStatusFilter();
+    });
+});
+
+if (document.getElementById('analyticsFilters')) {
+    applyAnalyticsPreset('24h');
+}
+
+paginateTables();
 
 document.querySelector('[data-toggle-sidebar]')?.addEventListener('click', () => {
     document.getElementById('sidebar')?.classList.toggle('open');

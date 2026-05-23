@@ -5,6 +5,9 @@
     --text: #edf4ff;
     --muted: #93a4bd;
     --line: rgba(148, 163, 184, .18);
+    --field-bg: rgba(255, 255, 255, .05);
+    --option-bg: #121826;
+    --option-text: #edf4ff;
     --brand: #49d3ff;
     --brand-2: #8b5cf6;
     --success: #37d399;
@@ -22,6 +25,9 @@
     --text: #111827;
     --muted: #5f6c80;
     --line: rgba(17, 24, 39, .12);
+    --field-bg: rgba(255, 255, 255, .9);
+    --option-bg: #ffffff;
+    --option-text: #111827;
     color-scheme: light;
 }
 
@@ -153,6 +159,22 @@ table { width: 100%; border-collapse: collapse; min-width: 740px; }
 th, td { padding: 14px; text-align: left; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; }
 td small { display: block; margin-top: 4px; }
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 14px;
+    color: var(--muted);
+}
+.pagination .btn {
+    min-width: 92px;
+}
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+    transform: none;
+}
 .status { display: inline-flex; padding: 5px 9px; border-radius: 999px; background: rgba(148, 163, 184, .14); color: var(--muted); text-transform: capitalize; font-size: .78rem; }
 .status.active, .status.succeeded { color: var(--success); background: rgba(55, 211, 153, .12); }
 .status.failed, .status.disabled { color: var(--danger); background: rgba(251, 113, 133, .12); }
@@ -167,18 +189,69 @@ td small { display: block; margin-top: 4px; }
 .data-stats strong { display: block; color: var(--text); }
 .row-actions { flex-wrap: wrap; }
 .inline-filters { margin-bottom: 14px; }
+.analytics-filters {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.2fr) repeat(2, minmax(180px, 1fr)) auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+}
+.preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.segmented-control {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--field-bg);
+}
+.segmented-control button {
+    min-height: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+.segmented-control button.active,
+.segmented-control button:hover {
+    background: var(--panel-strong);
+    color: var(--text);
+}
+.analytics-page { display: grid; gap: 12px; }
 
 label { display: grid; gap: 8px; color: var(--muted); }
 input, select {
     width: 100%;
     padding: 12px;
     color: var(--text);
-    background: rgba(255, 255, 255, .05);
+    background-color: var(--field-bg);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     outline: 0;
 }
 input:focus, select:focus { border-color: var(--brand); }
+select {
+    color: var(--text);
+    color-scheme: dark;
+    cursor: pointer;
+}
+select option,
+select optgroup {
+    background-color: var(--option-bg);
+    color: var(--option-text);
+}
+select option:checked {
+    background-color: var(--brand);
+    color: #06111b;
+}
+[data-theme="light"] select { color-scheme: light; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .stack { display: grid; gap: 14px; }
 .modal { border: 0; padding: 0; background: transparent; width: min(820px, calc(100vw - 28px)); }
@@ -256,6 +329,7 @@ input:focus, select:focus { border-color: var(--brand); }
     .metric-grid { grid-template-columns: repeat(2, 1fr); }
     .metric-grid.compact { grid-template-columns: repeat(2, 1fr); }
     .store-history-summary { grid-template-columns: repeat(2, 1fr); }
+    .analytics-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .span-2 { grid-column: span 1; }
 }
 @media (max-width: 640px) {
@@ -264,5 +338,6 @@ input:focus, select:focus { border-color: var(--brand); }
     .metric-grid, .dashboard-grid, .form-grid { grid-template-columns: 1fr; }
     .metric-grid.compact, .details-grid { grid-template-columns: 1fr; }
     .store-history-summary { grid-template-columns: 1fr; }
+    .analytics-filters { grid-template-columns: 1fr; }
     .search-box { min-width: 100%; }
 }

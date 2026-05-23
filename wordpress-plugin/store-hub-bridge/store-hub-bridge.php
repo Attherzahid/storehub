@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Store Hub Bridge
  * Description: Secure WooCommerce data bridge for the Store Hub admin dashboard.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Store Hub
  * Requires PHP: 8.0
  * Text Domain: store-hub-bridge
@@ -123,14 +123,10 @@ final class Store_Hub_Bridge
         ]);
 
         $payloadOrders = [];
-        $monthlySales = 0.0;
         $recentSales = 0.0;
         foreach ($orders as $order) {
             $total = (float) $order->get_total();
             $recentSales += $order->is_paid() ? $total : 0;
-            if ($order->get_date_created() && $order->get_date_created()->date('Y-m') === gmdate('Y-m')) {
-                $monthlySales += $total;
-            }
             $payloadOrders[] = [
                 'id' => 'wc_' . $order->get_id(),
                 'customer_email' => $order->get_billing_email(),
@@ -145,7 +141,7 @@ final class Store_Hub_Bridge
         $payload = [
             'summary' => [
                 'total_sales' => $this->totalSales($recentSales),
-                'monthly_sales' => $monthlySales,
+                'monthly_sales' => $this->monthlySales(),
                 'currency' => function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : get_option('woocommerce_currency', 'USD'),
                 'order_count' => $orderCount,
                 'average_order_value' => count($orders) ? array_sum(array_column($payloadOrders, 'total')) / count($orders) : 0,
@@ -252,6 +248,23 @@ final class Store_Hub_Bridge
         if (!$orders) {
             return $fallback;
         }
+
+        $total = 0.0;
+        foreach ($orders as $order) {
+            $total += (float) $order->get_total();
+        }
+
+        return $total;
+    }
+
+    private function monthlySales(): float
+    {
+        $orders = wc_get_orders([
+            'limit' => -1,
+            'status' => $this->paidStatuses(),
+            'date_created' => gmdate('Y-m-01') . '...' . gmdate('Y-m-t 23:59:59'),
+            'return' => 'objects',
+        ]);
 
         $total = 0.0;
         foreach ($orders as $order) {
