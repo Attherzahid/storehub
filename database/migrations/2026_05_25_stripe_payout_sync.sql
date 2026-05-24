@@ -1,4 +1,4 @@
-USE store_hub;
+USE orpiemma_storehub;
 
 ALTER TABLE stripe_keys
     ADD COLUMN waiting_started_at DATETIME NULL AFTER target_started_at,

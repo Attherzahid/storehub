@@ -38,7 +38,7 @@ function wait_time(?string $date): string
 
 function edit_key_payload(array $key): string
 {
-    unset($key['secret_key_encrypted'], $key['secret_key_masked']);
+    unset($key['secret_key_encrypted'], $key['secret_key_masked'], $key['public_key_masked']);
     return e(json_encode($key));
 }
 ?>
@@ -76,7 +76,7 @@ function edit_key_payload(array $key): string
                     <div class="card-top"><h3><?= e($key['company_name']) ?></h3><span class="status active">ready</span></div>
                     <p><?= e($key['email']) ?> &middot; <?= e($key['country_flag']) ?> <?= e($key['country_name']) ?></p>
                     <div class="credential-box">
-                        <span>Public key<code><?= e($key['public_key']) ?></code></span>
+                        <span>Public key<code><?= e($key['public_key_masked']) ?></code></span>
                         <span>Secret key<code><?= e($key['secret_key_masked']) ?></code></span>
                     </div>
                     <div class="key-facts">
@@ -115,7 +115,7 @@ function edit_key_payload(array $key): string
                     <div class="card-top"><h3><?= e($key['company_name']) ?></h3><span class="status syncing">waiting</span></div>
                     <p><?= e($key['email']) ?> &middot; <?= e($key['country_flag']) ?> <?= e($key['country_name']) ?></p>
                     <div class="credential-box">
-                        <span>Public key<code><?= e($key['public_key']) ?></code></span>
+                        <span>Public key<code><?= e($key['public_key_masked']) ?></code></span>
                         <span>Secret key<code><?= e($key['secret_key_masked']) ?></code></span>
                     </div>
                     <div class="key-facts">

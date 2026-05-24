@@ -31,6 +31,7 @@ final class StripeKey
         $stmt = db()->prepare($sql);
         $stmt->execute($params);
         return array_map(static function (array $key): array {
+            $key['public_key_masked'] = self::maskedCredential((string) $key['public_key']);
             $key['secret_key_masked'] = self::maskedSecret((string) $key['secret_key_encrypted']);
             return $key;
         }, $stmt->fetchAll());
@@ -241,7 +242,16 @@ final class StripeKey
             return 'Unavailable';
         }
 
-        return substr($secret, 0, min(8, strlen($secret))) . '******' . substr($secret, -4);
+        return self::maskedCredential($secret);
+    }
+
+    private static function maskedCredential(string $key): string
+    {
+        if ($key === '') {
+            return 'Unavailable';
+        }
+
+        return substr($key, 0, min(8, strlen($key))) . '******' . substr($key, -4);
     }
 
     public static function details(int $id): ?array
@@ -252,6 +262,7 @@ final class StripeKey
         if (!$key) {
             return null;
         }
+        $key['public_key_masked'] = self::maskedCredential((string) $key['public_key']);
         $key['secret_key_masked'] = self::maskedSecret((string) $key['secret_key_encrypted']);
         unset($key['secret_key_encrypted']);
 

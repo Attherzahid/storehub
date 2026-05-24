@@ -1,4 +1,4 @@
-USE store_hub;
+USE orpiemma_storehub;
 
 ALTER TABLE stripe_keys
     ADD COLUMN workflow_status ENUM('ready','payout_waiting') NOT NULL DEFAULT 'ready' AFTER status,
