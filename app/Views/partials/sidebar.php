@@ -5,6 +5,8 @@ $items = [
     'keys' => ['Keys', 'fa-key'],
     'stores' => ['Stores', 'fa-store'],
     'analytics' => ['Analytics', 'fa-chart-line'],
+    'transactions' => ['Transactions', 'fa-receipt'],
+    'activity' => ['Activity', 'fa-clock-rotate-left'],
     'settings' => ['Settings', 'fa-gear'],
 ];
 $activePage = ($currentPage ?? '') === 'key-details' ? 'keys' : ($currentPage ?? '');

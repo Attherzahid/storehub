@@ -101,7 +101,12 @@ function paginateTable(table, pageSize = 20) {
 
     const rows = Array.from(tbody.querySelectorAll('tr'));
     const visibleRows = () => rows.filter(row => row.dataset.filtered !== 'true');
-    if (visibleRows().length <= pageSize) return;
+    if (visibleRows().length <= pageSize) {
+        rows.forEach(row => {
+            row.hidden = row.dataset.filtered === 'true';
+        });
+        return;
+    }
 
     table.dataset.paginated = 'true';
     let page = 1;
@@ -146,6 +151,46 @@ function paginateTables(scope = document) {
     scope.querySelectorAll('table').forEach(table => paginateTable(table, 20));
 }
 
+function updateRowFilterState(row) {
+    row.dataset.filtered = row.dataset.searchFiltered === 'true' || row.dataset.statusFiltered === 'true' ? 'true' : 'false';
+}
+
+function refreshTablePagination(table) {
+    if (!table) return;
+    table.removeAttribute('data-paginated');
+    const controls = table.closest('.table-wrap')?.nextElementSibling;
+    if (controls?.classList.contains('pagination')) {
+        controls.remove();
+    }
+    paginateTable(table, 20);
+}
+
+function applyContentSearch(input) {
+    if (!input) return;
+    const target = document.querySelector(input.dataset.searchTarget);
+    if (!target) return;
+    const query = input.value.trim().toLowerCase();
+    const items = target.querySelectorAll(input.dataset.searchItems);
+    const tables = new Set();
+
+    items.forEach(item => {
+        const matches = query === '' || item.textContent.toLowerCase().includes(query);
+        if (item.tagName === 'TR') {
+            item.dataset.searchFiltered = matches ? 'false' : 'true';
+            updateRowFilterState(item);
+            tables.add(item.closest('table'));
+        } else {
+            item.hidden = !matches;
+        }
+    });
+
+    tables.forEach(table => refreshTablePagination(table));
+}
+
+document.querySelectorAll('[data-content-search]').forEach(input => {
+    input.addEventListener('input', () => applyContentSearch(input));
+});
+
 async function loadAnalytics() {
     const form = document.getElementById('analyticsFilters');
     if (!form) return;
@@ -187,10 +232,9 @@ async function loadAnalytics() {
         </tr>
     `).join('') : '<tr><td colspan="5"><small>No transactions found for this range.</small></td></tr>';
     const analyticsTable = document.getElementById('analyticsTransactions')?.closest('table');
-    analyticsTable?.removeAttribute('data-paginated');
-    analyticsTable?.closest('.table-wrap')?.nextElementSibling?.classList.contains('pagination') && analyticsTable.closest('.table-wrap').nextElementSibling.remove();
-    paginateTable(analyticsTable, 20);
     applyTransactionStatusFilter();
+    const search = Array.from(document.querySelectorAll('[data-content-search]')).find(input => input.dataset.searchTarget === '#analyticsTransactionTable');
+    applyContentSearch(search);
 }
 
 function applyAnalyticsPreset(preset) {
@@ -223,15 +267,11 @@ function applyTransactionStatusFilter() {
     const active = group.querySelector('.active')?.dataset.status || 'all';
     tbody.querySelectorAll('tr').forEach(row => {
         const status = row.querySelector('.status')?.textContent?.trim() || '';
-        row.dataset.filtered = active !== 'all' && status !== active ? 'true' : 'false';
+        row.dataset.statusFiltered = active !== 'all' && status !== active ? 'true' : 'false';
+        updateRowFilterState(row);
     });
 
-    table.removeAttribute('data-paginated');
-    table.closest('.table-wrap')?.nextElementSibling?.classList.contains('pagination') && table.closest('.table-wrap').nextElementSibling.remove();
-    tbody.querySelectorAll('tr').forEach(row => {
-        row.hidden = row.dataset.filtered === 'true';
-    });
-    paginateTable(table, 20);
+    refreshTablePagination(table);
 }
 
 document.querySelectorAll('[data-status-filter] button').forEach(button => {
@@ -261,10 +301,133 @@ document.getElementById('themeToggle')?.addEventListener('click', () => {
 document.documentElement.dataset.theme = localStorage.getItem('storeHubTheme') || 'dark';
 
 document.querySelectorAll('[data-open-modal]').forEach(button => {
-    button.addEventListener('click', () => document.getElementById(button.dataset.openModal)?.showModal());
+    button.addEventListener('click', () => {
+        const modal = document.getElementById(button.dataset.openModal);
+        const form = modal?.querySelector('form');
+        if (form) {
+            form.reset();
+            const id = form.querySelector('[name="id"]');
+            if (id) id.value = '';
+        }
+        modal?.showModal();
+    });
 });
 document.querySelectorAll('[data-close-modal]').forEach(button => {
     button.addEventListener('click', () => button.closest('dialog')?.close());
+});
+
+async function refreshStripePayout(id) {
+    const response = await fetch('api/key-payout-sync.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({ id })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+        throw new Error(result.error || 'Unable to refresh Stripe payout data');
+    }
+    return result;
+}
+
+document.querySelectorAll('[data-refresh-payout]').forEach(button => {
+    button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+            const result = await refreshStripePayout(button.dataset.refreshPayout);
+            toast(result.message || 'Stripe payout data refreshed');
+            setTimeout(() => location.reload(), 700);
+        } catch (error) {
+            toast(error.message);
+            button.disabled = false;
+        }
+    });
+});
+
+async function refreshWaitingPayouts(showNotice = true) {
+    const buttons = Array.from(document.querySelectorAll('.waiting-column [data-refresh-payout]'));
+    if (!buttons.length) return;
+    buttons.forEach(button => { button.disabled = true; });
+    const results = await Promise.allSettled(buttons.map(button => refreshStripePayout(button.dataset.refreshPayout)));
+    const failures = results.filter(result => result.status === 'rejected');
+    if (showNotice) {
+        toast(failures.length
+            ? `${buttons.length - failures.length} payout records refreshed; ${failures.length} could not be fetched.`
+            : 'Waiting payouts refreshed from Stripe.');
+    }
+    if (failures.length === buttons.length) {
+        buttons.forEach(button => { button.disabled = false; });
+        if (!showNotice && failures[0]?.reason?.message) toast(failures[0].reason.message);
+        return;
+    }
+    setTimeout(() => location.reload(), showNotice ? 700 : 100);
+}
+
+document.querySelector('[data-refresh-waiting]')?.addEventListener('click', () => refreshWaitingPayouts());
+
+if (document.querySelector('.waiting-column [data-refresh-payout]')) {
+    const refreshKey = 'storeHubWaitingPayoutRefresh';
+    const lastRefresh = Number(sessionStorage.getItem(refreshKey) || 0);
+    if (Date.now() - lastRefresh > 300000) {
+        sessionStorage.setItem(refreshKey, String(Date.now()));
+        refreshWaitingPayouts(false);
+    }
+}
+
+document.querySelectorAll('[data-reveal-key]').forEach(button => {
+    button.addEventListener('click', () => {
+        const modal = document.getElementById('revealKeyModal');
+        const form = modal?.querySelector('[data-reveal-secret-form]');
+        if (!modal || !form) return;
+        form.reset();
+        form.elements.id.value = button.dataset.revealKey;
+        form.querySelector('[data-reveal-company]').textContent = `${button.dataset.company}: confirm your admin password to view this secret key.`;
+        form.querySelector('.revealed-secret').hidden = true;
+        form.querySelector('[data-copy-secret]').hidden = true;
+        modal.showModal();
+    });
+});
+
+document.querySelector('[data-reveal-secret-form]')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+        const response = await fetch('api/key-secret.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+            body: JSON.stringify({
+                id: form.elements.id.value,
+                password: form.elements.password.value
+            })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to reveal secret key');
+        form.elements.revealed_secret.value = result.secret_key;
+        form.elements.password.value = '';
+        form.querySelector('.revealed-secret').hidden = false;
+        form.querySelector('[data-copy-secret]').hidden = false;
+        toast('Secret key revealed. This action has been recorded.');
+    } catch (error) {
+        toast(error.message);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+document.querySelector('[data-copy-secret]')?.addEventListener('click', async event => {
+    const input = event.currentTarget.closest('form')?.elements.revealed_secret;
+    input?.select();
+    await navigator.clipboard?.writeText(input?.value || '');
+    toast('Secret key copied');
+});
+
+document.getElementById('revealKeyModal')?.addEventListener('close', event => {
+    const form = event.currentTarget.querySelector('form');
+    if (!form) return;
+    form.reset();
+    form.querySelector('.revealed-secret').hidden = true;
+    form.querySelector('[data-copy-secret]').hidden = true;
 });
 
 document.querySelectorAll('[data-edit]').forEach(button => {
@@ -300,6 +463,47 @@ document.querySelectorAll('[data-ajax-form]').forEach(form => {
         const result = await response.json();
         toast(result.message || 'Saved');
         if (response.ok) setTimeout(() => location.reload(), 700);
+    });
+});
+
+document.querySelectorAll('[data-target-reached]').forEach(button => {
+    button.addEventListener('click', () => {
+        const modal = document.getElementById('targetReachedModal');
+        modal.querySelector('[name="key_id"]').value = button.dataset.targetReached;
+        modal.querySelector('[data-workflow-company]').textContent = `${button.dataset.company}: Stripe will provide the payout arrival date when available.`;
+        modal.querySelectorAll('[name="replacement_key_id"] option').forEach(option => {
+            option.disabled = option.value === button.dataset.targetReached;
+        });
+        modal.querySelector('[name="replacement_key_id"]').value = '';
+        modal.showModal();
+    });
+});
+
+document.querySelectorAll('[data-record-payout]').forEach(button => {
+    button.addEventListener('click', () => {
+        const modal = document.getElementById('payoutReceivedModal');
+        modal.querySelector('[name="key_id"]').value = button.dataset.recordPayout;
+        modal.querySelector('[name="payout_date"]').value = formatLocalInput(new Date()).slice(0, 10);
+        modal.querySelector('[data-workflow-company]').textContent = `${button.dataset.company}: confirm the payout received to calculate its next target.`;
+        modal.showModal();
+    });
+});
+
+document.querySelectorAll('[data-key-workflow]').forEach(form => {
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const payload = Object.fromEntries(new FormData(form).entries());
+        payload.action = form.dataset.keyWorkflow;
+        const response = await fetch('api/key-workflow.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        toast(result.message || result.error || 'Unable to update key workflow');
+        if (response.ok) {
+            setTimeout(() => location.reload(), 700);
+        }
     });
 });
 

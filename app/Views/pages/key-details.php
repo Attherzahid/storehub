@@ -33,7 +33,8 @@ foreach ($transactions as $transaction) {
         <div>
             <p class="eyebrow">Stripe key history</p>
             <h2><?= e($key['company_name']) ?></h2>
-            <p><?= e($key['email']) ?> · <?= e($key['country_flag']) ?> <?= e($key['country_name']) ?> · <?= e($key['payout_timing']) ?></p>
+            <p><?= e($key['email']) ?> &middot; <?= e($key['country_flag']) ?> <?= e($key['country_name']) ?> &middot; <?= e($key['payout_timing']) ?></p>
+            <p><code><?= e($key['public_key']) ?></code> &middot; <code><?= e($key['secret_key_masked']) ?></code></p>
         </div>
         <a class="btn ghost" href="index.php?page=keys"><i class="fa-solid fa-arrow-left"></i>Back</a>
     </div>
@@ -56,7 +57,7 @@ foreach ($transactions as $transaction) {
             <div class="panel-head">
                 <div>
                     <h2><?= e($store['name']) ?></h2>
-                    <p><?= e($store['domain']) ?> · Last sync: <?= e($store['last_sync_at'] ?: 'Never') ?></p>
+                    <p><?= e($store['domain']) ?> &middot; Last sync: <?= e($store['last_sync_at'] ?: 'Never') ?></p>
                 </div>
                 <span class="status <?= e($store['status']) ?>"><?= e($store['status']) ?></span>
             </div>
@@ -67,8 +68,12 @@ foreach ($transactions as $transaction) {
                 <span>Failed <strong><?= number_format((int) $store['failed_count']) ?></strong></span>
                 <span>Refunds <strong><?= number_format((int) $store['refund_count']) ?></strong></span>
             </div>
+            <div class="filter-box data-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input data-content-search data-search-target="#keyStoreTransactions<?= (int) $store['id'] ?>" data-search-items="tbody tr" placeholder="Search transactions">
+            </div>
             <div class="table-wrap">
-                <table>
+                <table id="keyStoreTransactions<?= (int) $store['id'] ?>">
                     <thead><tr><th>Transaction</th><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
                     <tbody>
                         <?php if (!$storeTransactions): ?>

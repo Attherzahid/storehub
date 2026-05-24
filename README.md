@@ -28,11 +28,19 @@ DB_PASS=
 http://localhost/store-hub/public/login.php
 ```
 
-Demo login:
+Seeded admin email:
 
 ```text
-admin@storehub.local
-password
+ameerhamzadeveloper@gmail.com
+```
+
+Set or reset its password with `php scripts/reset-admin.php ameerhamzadeveloper@gmail.com admin123`.
+
+For an existing live database, apply the newer key workflow columns before deploying the matching PHP files:
+
+```sql
+SOURCE database/migrations/2026_05_25_key_lifecycle.sql;
+SOURCE database/migrations/2026_05_25_stripe_payout_sync.sql;
 ```
 
 ## WordPress Plugin
@@ -50,12 +58,14 @@ Create a matching row in `store_connections` with `SHA2('your-token', 256)` and 
 ## Security Notes
 
 - Admin writes use CSRF tokens.
+- Admin write and secret-reveal endpoints require an administrator session.
 - SQL uses PDO prepared statements.
 - Stripe secret keys are encrypted before storage.
 - API store sync uses bearer tokens stored as SHA-256 hashes.
-- Secret keys are never rendered in frontend responses.
+- The Keys page displays publishable keys normally and secret keys as a mask such as `sk_live_******A92f`.
+- Revealing a secret key requires the signed-in administrator password and is written to activity logs.
 
-For production Stripe verification, install `stripe/stripe-php` with Composer and replace `api/stripe-verify.php` with a server-side Account API call.
+Payout waiting cards call Stripe from the PHP backend using the encrypted secret key. The app imports the payout schedule, expected arrival date, and paid status without exposing that secret to page markup or ordinary API responses.
 
 ## Namecheap Deployment
 

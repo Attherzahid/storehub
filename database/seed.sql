@@ -8,6 +8,16 @@ INSERT INTO stripe_keys (company_name,email,phone,country_name,country_flag,publ
 ('Atlas Retail Group','finance@atlas.test','+44 20 5555 0102','United Kingdom','🇬🇧','pk_test_atlas','YRt6BBbVsklJbsAzXf/xHoN0djVrE5RkOIi2GnVlRWXxBffXCFtsA2OtJ9UaJI9M','18 months','Weekly','2026-05-14',94760.00,'active',NOW() - INTERVAL 40 DAY),
 ('Crescent Commerce','billing@crescent.test','+971 55 000 1234','United Arab Emirates','🇦🇪','pk_test_crescent','YRt6BBbVsklJbsAzXf/xHoN0djVrE5RkOIi2GnVlRWXxBffXCFtsA2OtJ9UaJI9M','9 months','Rolling 7 days','2026-05-12',35210.75,'disabled',NOW() - INTERVAL 15 DAY);
 
+UPDATE stripe_keys
+SET baseline_volume = total_processed_volume,
+    workflow_status = CASE WHEN total_processed_volume <= 0 THEN 'payout_waiting' ELSE 'ready' END,
+    target_sales = CASE WHEN total_processed_volume <= 0 THEN 5.00 ELSE ROUND(total_processed_volume * 0.80, 2) END,
+    target_plan = CASE WHEN total_processed_volume <= 0 THEN 'starter' ELSE 'established' END,
+    workflow_note = CASE
+        WHEN total_processed_volume <= 0 THEN 'Complete an initial $5 transaction, then record its payout.'
+        ELSE 'Existing history recorded; begin with an 80% baseline target.'
+    END;
+
 INSERT INTO stores (stripe_key_id,name,domain,total_sales,monthly_sales,currency,order_count,average_order_value,status,last_sync_at,woocommerce_version,wordpress_version,created_at,updated_at) VALUES
 (1,'Luma Home','https://luma-home.test',124600.40,18420.50,'USD',2498,49.88,'active',NOW() - INTERVAL 8 MINUTE,'8.8.3','6.5.4',NOW() - INTERVAL 75 DAY,NOW()),
 (1,'Peak Outfitters','https://peak-outfitters.test',61830.00,9600.25,'USD',1162,53.21,'active',NOW() - INTERVAL 18 MINUTE,'8.9.1','6.5.5',NOW() - INTERVAL 60 DAY,NOW()),

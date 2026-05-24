@@ -61,16 +61,22 @@ $stores = Store::all();
 <section class="panel">
     <div class="panel-head">
         <h2>Transaction log</h2>
-        <div class="segmented-control" data-status-filter>
-            <button class="active" type="button" data-status="all">All</button>
-            <button type="button" data-status="succeeded">Succeeded</button>
-            <button type="button" data-status="pending">Pending</button>
-            <button type="button" data-status="failed">Failed</button>
-            <button type="button" data-status="refunded">Refunded</button>
+        <div class="panel-actions">
+            <div class="filter-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input data-content-search data-search-target="#analyticsTransactionTable" data-search-items="tbody tr" placeholder="Search transactions">
+            </div>
+            <div class="segmented-control" data-status-filter>
+                <button class="active" type="button" data-status="all">All</button>
+                <button type="button" data-status="succeeded">Succeeded</button>
+                <button type="button" data-status="pending">Pending</button>
+                <button type="button" data-status="failed">Failed</button>
+                <button type="button" data-status="refunded">Refunded</button>
+            </div>
         </div>
     </div>
     <div class="table-wrap">
-        <table>
+        <table id="analyticsTransactionTable">
             <thead><tr><th>Store</th><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
             <tbody id="analyticsTransactions"></tbody>
         </table>

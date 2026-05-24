@@ -33,12 +33,78 @@ final class Dashboard
         ];
     }
 
+    public static function storesOverview(): array
+    {
+        $stmt = db()->query("
+            SELECT
+                s.id,
+                s.name,
+                s.domain,
+                s.total_sales,
+                s.monthly_sales,
+                s.currency,
+                s.status,
+                k.company_name stripe_company,
+                k.status stripe_status,
+                COUNT(t.id) transaction_count
+            FROM stores s
+            LEFT JOIN stripe_keys k ON k.id = s.stripe_key_id
+            LEFT JOIN transactions t ON t.store_id = s.id
+            GROUP BY
+                s.id,
+                s.name,
+                s.domain,
+                s.total_sales,
+                s.monthly_sales,
+                s.currency,
+                s.status,
+                k.company_name,
+                k.status
+            ORDER BY transaction_count DESC, s.monthly_sales DESC, s.name ASC
+        ");
+
+        return $stmt->fetchAll();
+    }
+
     public static function recentTransactions(int $limit = 8): array
     {
         $stmt = db()->prepare('SELECT t.*, s.name store_name FROM transactions t LEFT JOIN stores s ON s.id=t.store_id ORDER BY t.created_at DESC LIMIT ?');
         $stmt->bindValue(1, $limit, \PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
+    }
+
+    public static function transactionsByStore(int $limit = 500): array
+    {
+        $stmt = db()->prepare("
+            SELECT
+                t.*,
+                COALESCE(s.name, 'Unassigned store') store_name,
+                s.domain store_domain,
+                s.currency store_currency,
+                k.company_name stripe_company
+            FROM transactions t
+            LEFT JOIN stores s ON s.id = t.store_id
+            LEFT JOIN stripe_keys k ON k.id = s.stripe_key_id
+            ORDER BY store_name ASC, t.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->bindValue(1, $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        $grouped = [];
+        foreach ($stmt->fetchAll() as $transaction) {
+            $storeId = (int) ($transaction['store_id'] ?? 0);
+            $grouped[$storeId]['store'] ??= [
+                'name' => $transaction['store_name'],
+                'domain' => $transaction['store_domain'],
+                'currency' => $transaction['store_currency'] ?: $transaction['currency'],
+                'stripe_company' => $transaction['stripe_company'],
+            ];
+            $grouped[$storeId]['transactions'][] = $transaction;
+        }
+
+        return array_values($grouped);
     }
 
     public static function activity(int $limit = 8): array

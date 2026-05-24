@@ -89,6 +89,13 @@ Then reset the admin login from cPanel Terminal:
 php scripts/reset-admin.php ameerhamzadeveloper@gmail.com admin123
 ```
 
+When updating an existing installation to the key workflow and Stripe payout refresh features, run these files in phpMyAdmin before deploying the updated PHP files:
+
+```sql
+database/migrations/2026_05_25_key_lifecycle.sql
+database/migrations/2026_05_25_stripe_payout_sync.sql
+```
+
 ## Security
 
 The root `.htaccess` blocks direct browser access to:

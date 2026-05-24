@@ -24,6 +24,19 @@ CREATE TABLE stripe_keys (
     last_payout_date DATE NULL,
     total_processed_volume DECIMAL(14,2) NOT NULL DEFAULT 0,
     status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+    workflow_status ENUM('ready','payout_waiting') NOT NULL DEFAULT 'ready',
+    baseline_volume DECIMAL(14,2) NOT NULL DEFAULT 0,
+    target_sales DECIMAL(14,2) NOT NULL DEFAULT 0,
+    target_plan ENUM('starter','standard','established') NOT NULL DEFAULT 'starter',
+    target_step TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    target_started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    waiting_started_at DATETIME NULL,
+    payout_due_date DATE NULL,
+    payout_received TINYINT(1) NOT NULL DEFAULT 0,
+    stripe_payout_id VARCHAR(190) NULL,
+    stripe_payout_status VARCHAR(40) NULL,
+    stripe_payout_synced_at DATETIME NULL,
+    workflow_note VARCHAR(255) NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_stripe_status (status),
     INDEX idx_stripe_company (company_name)
@@ -67,10 +80,11 @@ CREATE TABLE transactions (
 CREATE TABLE payouts (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     stripe_key_id BIGINT UNSIGNED NULL,
+    stripe_payout_id VARCHAR(190) NULL UNIQUE,
     amount DECIMAL(12,2) NOT NULL,
     currency CHAR(3) NOT NULL DEFAULT 'USD',
     payout_date DATE NOT NULL,
-    status ENUM('paid','pending','failed') NOT NULL DEFAULT 'paid',
+    status ENUM('paid','pending','in_transit','failed','canceled') NOT NULL DEFAULT 'paid',
     CONSTRAINT fk_payouts_key FOREIGN KEY (stripe_key_id) REFERENCES stripe_keys(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
@@ -102,6 +116,6 @@ CREATE TABLE store_connections (
     status ENUM('active','revoked') NOT NULL DEFAULT 'active',
     last_seen_at DATETIME NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_connections_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+    CONSTRAINT fk_connections_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
     UNIQUE KEY uniq_connections_store (store_id)
 ) ENGINE=InnoDB;

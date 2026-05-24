@@ -13,6 +13,9 @@ $pdo->beginTransaction();
 try {
     $storeId = (int) $connection['store_id'];
     $summary = $input['summary'] ?? [];
+    $keyStmt = $pdo->prepare('SELECT stripe_key_id FROM stores WHERE id=? LIMIT 1');
+    $keyStmt->execute([$storeId]);
+    $stripeKeyId = $keyStmt->fetchColumn() ?: null;
     $stmt = $pdo->prepare('UPDATE stores SET total_sales=?, monthly_sales=?, currency=?, order_count=?, average_order_value=?, last_sync_at=NOW(), woocommerce_version=?, wordpress_version=?, updated_at=NOW() WHERE id=?');
     $stmt->execute([
         (float) ($summary['total_sales'] ?? 0),
@@ -30,7 +33,7 @@ try {
     foreach (($input['orders'] ?? []) as $order) {
         $insert->execute([
             $storeId,
-            null,
+            $stripeKeyId,
             (string) ($order['id'] ?? ''),
             filter_var($order['customer_email'] ?? '', FILTER_SANITIZE_EMAIL),
             (float) ($order['total'] ?? 0),

@@ -3,7 +3,7 @@
 use App\Models\Store;
 use App\Models\StripeKey;
 
-$stores = Store::all($_GET['search'] ?? null);
+$stores = Store::all();
 $keys = StripeKey::all();
 ?>
 <section class="panel">
@@ -11,13 +11,12 @@ $keys = StripeKey::all();
         <h2>Connected stores</h2>
         <button class="btn primary" data-open-modal="storeModal"><i class="fa-solid fa-plus"></i>Add store</button>
     </div>
-    <form class="inline-filters" method="get">
-        <input type="hidden" name="page" value="stores">
-        <input name="search" value="<?= e($_GET['search'] ?? '') ?>" placeholder="Search stores or domains">
-        <button class="btn ghost">Filter</button>
-    </form>
+    <div class="filter-box data-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input data-content-search data-search-target="#storesTable" data-search-items="tbody tr" placeholder="Search store, domain, Stripe key, or status">
+    </div>
     <div class="table-wrap">
-        <table>
+        <table id="storesTable">
             <thead><tr><th>Store</th><th>Sales</th><th>Orders</th><th>Stripe key</th><th>Status</th><th>Last sync</th><th></th></tr></thead>
             <tbody>
                 <?php foreach ($stores as $store): ?>
