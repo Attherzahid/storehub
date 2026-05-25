@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\StripeKey;
+
 require __DIR__ . '/_bootstrap.php';
 
 $connection = require_api_token();
@@ -43,9 +45,15 @@ try {
         ]);
     }
 
+    $pausedKeys = $stripeKeyId ? StripeKey::automaticallyWaitForReachedTargets((int) $stripeKeyId) : [];
     log_activity('WooCommerce store synced', 'sync');
+    if ($pausedKeys) {
+        log_activity('Stripe key automatically moved to payout waiting after approaching its sales target', 'stripe');
+    }
     $pdo->commit();
-    json_response(['message' => 'Store synced']);
+    json_response(['message' => $pausedKeys
+        ? 'Store synced. Its Stripe key is now waiting for payout after approaching the sales target.'
+        : 'Store synced']);
 } catch (Throwable $exception) {
     $pdo->rollBack();
     json_response(['error' => 'Sync failed'], 422);

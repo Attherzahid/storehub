@@ -1,0 +1,13 @@
+{
+  "name": "digitalogies/stripe-payment",
+  "description": "WooCommerce Stripe Checkout gateway using the official Stripe PHP SDK.",
+  "type": "wordpress-plugin",
+  "require": {
+    "stripe/stripe-php": "^16.0"
+  },
+  "autoload": {
+    "classmap": [
+      "includes/"
+    ]
+  }
+}

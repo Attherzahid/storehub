@@ -35,6 +35,16 @@ try {
         log_activity('Stripe payout confirmed; key returned to ready list', 'stripe');
         json_response(['message' => 'Payout confirmed. Key is ready with its next target.']);
     }
+
+    if ($action === 'replace') {
+        $replacementId = (int) ($input['replacement_key_id'] ?? 0);
+        if ($replacementId < 1) {
+            json_response(['error' => 'Choose a replacement key.'], 422);
+        }
+        StripeKey::assignReplacementForWaiting($id, $replacementId);
+        log_activity('Store assignment moved from a waiting Stripe key to a ready key', 'stripe');
+        json_response(['message' => 'Connected stores assigned to the replacement key.']);
+    }
 } catch (Throwable $exception) {
     json_response(['error' => $exception->getMessage()], 422);
 }

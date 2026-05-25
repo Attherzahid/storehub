@@ -8,6 +8,7 @@ use App\Services\StripePayoutService;
 
 final class StripeKey
 {
+    public const AUTO_WAIT_PERCENT = 95;
     private const STANDARD_TARGETS = [1000, 2000, 3500, 5000, 8000, 10000];
     private const ESTABLISHED_ADDITIONS = [0, 2000, 3500, 5000, 8000, 10000];
 
@@ -102,6 +103,49 @@ final class StripeKey
         db()->prepare('DELETE FROM stripe_keys WHERE id=?')->execute([$id]);
     }
 
+    public static function automaticallyWaitForReachedTargets(?int $keyId = null): array
+    {
+        $sql = 'SELECT candidate.*
+                FROM (
+                    SELECT k.id, k.company_name, k.target_sales,
+                    (SELECT COALESCE(SUM(t.amount), 0)
+                        FROM transactions t
+                        WHERE t.stripe_key_id = k.id
+                          AND t.status = "succeeded"
+                          AND t.created_at >= k.target_started_at) cycle_sales
+                    FROM stripe_keys k
+                    WHERE k.workflow_status = "ready"
+                      AND k.status = "active"
+                      AND k.target_sales > 0';
+        $params = [];
+        if ($keyId !== null) {
+            $sql .= ' AND k.id = ?';
+            $params[] = $keyId;
+        }
+        $sql .= ') candidate
+                WHERE candidate.cycle_sales >= candidate.target_sales * ?';
+        $params[] = self::AUTO_WAIT_PERCENT / 100;
+
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        $reached = $stmt->fetchAll();
+        if (!$reached) {
+            return [];
+        }
+
+        $note = 'Automatically paused near the sales target. Replace this key on connected stores and wait for payout confirmation.';
+        $update = db()->prepare('UPDATE stripe_keys SET workflow_status="payout_waiting", waiting_started_at=NOW(), payout_due_date=NULL, payout_received=0, stripe_payout_status=NULL, workflow_note=? WHERE id=? AND workflow_status="ready"');
+        $moved = [];
+        foreach ($reached as $key) {
+            $update->execute([$note, (int) $key['id']]);
+            if ($update->rowCount() > 0) {
+                $moved[] = $key;
+            }
+        }
+
+        return $moved;
+    }
+
     public static function moveToPayoutWaiting(int $id, ?string $dueDate, ?int $replacementId): void
     {
         $pdo = db();
@@ -129,6 +173,31 @@ final class StripeKey
             $pdo->rollBack();
             throw $exception;
         }
+    }
+
+    public static function assignReplacementForWaiting(int $id, int $replacementId): void
+    {
+        if ($replacementId === $id) {
+            throw new \RuntimeException('Choose a different replacement key.');
+        }
+
+        $pdo = db();
+        $waiting = $pdo->prepare('SELECT id FROM stripe_keys WHERE id=? AND workflow_status="payout_waiting" LIMIT 1');
+        $waiting->execute([$id]);
+        if (!$waiting->fetchColumn()) {
+            throw new \RuntimeException('This key is not waiting for payout.');
+        }
+
+        $replacement = $pdo->prepare('SELECT id FROM stripe_keys WHERE id=? AND workflow_status="ready" AND status="active" LIMIT 1');
+        $replacement->execute([$replacementId]);
+        if (!$replacement->fetchColumn()) {
+            throw new \RuntimeException('Replacement key must be active and ready to use.');
+        }
+
+        $stores = $pdo->prepare('UPDATE stores SET stripe_key_id=?, updated_at=NOW() WHERE stripe_key_id=?');
+        $stores->execute([$replacementId, $id]);
+        $note = 'Waiting for payout confirmation. Connected stores were assigned to a replacement key.';
+        $pdo->prepare('UPDATE stripe_keys SET workflow_note=? WHERE id=?')->execute([$note, $id]);
     }
 
     public static function recordPayout(int $id, float $amount, string $currency, string $payoutDate, ?string $stripePayoutId = null): void

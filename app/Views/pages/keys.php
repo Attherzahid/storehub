@@ -2,6 +2,10 @@
 
 use App\Models\StripeKey;
 
+$autoPausedKeys = StripeKey::automaticallyWaitForReachedTargets();
+if ($autoPausedKeys) {
+    log_activity('Stripe key automatically moved to payout waiting after approaching its sales target', 'stripe');
+}
 $keys = StripeKey::all();
 $readyKeys = array_values(array_filter($keys, static fn (array $key): bool => $key['workflow_status'] === 'ready'));
 $waitingKeys = array_values(array_filter($keys, static fn (array $key): bool => $key['workflow_status'] === 'payout_waiting'));
@@ -64,7 +68,7 @@ function edit_key_payload(array $key): string
         <div class="workflow-column-head ready">
             <div>
                 <h2>Ready to use</h2>
-                <p>Available for assignment and sales targets</p>
+                <p>Automatically pauses at <?= StripeKey::AUTO_WAIT_PERCENT ?>% of target</p>
             </div>
             <strong><?= count($readyKeys) ?></strong>
         </div>
@@ -133,6 +137,9 @@ function edit_key_payload(array $key): string
                     <div class="row-actions">
                         <a class="btn ghost" href="index.php?page=key-details&id=<?= (int) $key['id'] ?>">Details</a>
                         <button class="btn primary" data-refresh-payout="<?= (int) $key['id'] ?>"><i class="fa-solid fa-rotate"></i>Refresh from Stripe</button>
+                        <?php if ($readyKeys && $key['connected_stores']): ?>
+                            <button class="btn primary" data-assign-replacement="<?= (int) $key['id'] ?>" data-company="<?= e($key['company_name']) ?>">Assign replacement</button>
+                        <?php endif; ?>
                         <button class="btn ghost" data-record-payout="<?= (int) $key['id'] ?>" data-company="<?= e($key['company_name']) ?>">Record manually</button>
                         <button class="btn ghost" data-reveal-key="<?= (int) $key['id'] ?>" data-company="<?= e($key['company_name']) ?>">Reveal</button>
                         <button class="btn ghost" data-edit='<?= edit_key_payload($key) ?>'>Edit</button>
@@ -187,8 +194,26 @@ function edit_key_payload(array $key): string
                 <?php endforeach; ?>
             </select>
         </label>
-        <p class="workflow-note">Stripe refresh will replace the fallback date with its payout arrival date. If this key is connected to a store, choosing a replacement moves those stores while payout is pending.</p>
+        <p class="workflow-note">Keys also move here automatically at <?= StripeKey::AUTO_WAIT_PERCENT ?>% of their target. Stripe refresh will replace the fallback date with its payout arrival date. If this key is connected to a store, choosing a replacement moves those stores while payout is pending.</p>
         <div class="modal-actions"><button type="button" class="btn ghost" data-close-modal>Cancel</button><button class="btn primary">Wait for payout</button></div>
+    </form>
+</dialog>
+
+<dialog class="modal" id="replacementKeyModal">
+    <form class="modal-card" data-key-workflow="replace">
+        <input type="hidden" name="key_id">
+        <h2>Assign replacement key</h2>
+        <p data-workflow-company></p>
+        <label>Ready key
+            <select name="replacement_key_id" required>
+                <option value="">Select a ready key</option>
+                <?php foreach ($readyKeys as $readyKey): ?>
+                    <option value="<?= (int) $readyKey['id'] ?>"><?= e($readyKey['company_name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <p class="workflow-note">This moves the dashboard store assignment to the ready key while the paused key remains in payout waiting.</p>
+        <div class="modal-actions"><button type="button" class="btn ghost" data-close-modal>Cancel</button><button class="btn primary">Assign key</button></div>
     </form>
 </dialog>
 

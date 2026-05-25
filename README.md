@@ -45,7 +45,7 @@ SOURCE database/migrations/2026_05_25_stripe_payout_sync.sql;
 
 ## WordPress Plugin
 
-Copy `wordpress-plugin/store-hub-bridge` into `wp-content/plugins/`, activate **Store Hub Bridge**, then open **Settings > Store Hub**.
+Upload `wordpress-plugin/store-hub-bridge` to `wp-content/plugins/`, activate **Store Hub Bridge and Stripe Payments**, then open **Settings > Store Hub**.
 
 Use this dashboard endpoint:
 
@@ -54,6 +54,8 @@ https://storehub.orpixia.com/api/store-sync.php
 ```
 
 Create a matching row in `store_connections` with `SHA2('your-token', 256)` and paste the plain token into the plugin settings.
+
+Dashboard synchronization and the optional Stripe Checkout payment gateway operate independently. Configure payments in **WooCommerce > Settings > Payments > Store Hub Stripe Checkout**. Select **Manual keys entered below** to manage keys in WordPress, or **Dashboard managed assignment** to securely use the ready key assigned to the store in Store Hub. If the separate Stripe payment plugin was already configured, the combined plugin imports those gateway settings once when activated.
 
 ## Security Notes
 
@@ -66,6 +68,8 @@ Create a matching row in `store_connections` with `SHA2('your-token', 256)` and 
 - Revealing a secret key requires the signed-in administrator password and is written to activity logs.
 
 Payout waiting cards call Stripe from the PHP backend using the encrypted secret key. The app imports the payout schedule, expected arrival date, and paid status without exposing that secret to page markup or ordinary API responses.
+
+Ready Stripe keys automatically move to payout waiting when successful tracked sales reach 95% of the active target, either during store sync or when the Keys page is loaded. The manual **Target reached** action remains available for early pauses and assigning a replacement key.
 
 ## Namecheap Deployment
 

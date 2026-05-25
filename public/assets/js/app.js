@@ -489,6 +489,16 @@ document.querySelectorAll('[data-record-payout]').forEach(button => {
     });
 });
 
+document.querySelectorAll('[data-assign-replacement]').forEach(button => {
+    button.addEventListener('click', () => {
+        const modal = document.getElementById('replacementKeyModal');
+        modal.querySelector('[name="key_id"]').value = button.dataset.assignReplacement;
+        modal.querySelector('[name="replacement_key_id"]').value = '';
+        modal.querySelector('[data-workflow-company]').textContent = `${button.dataset.company}: choose the ready key that should receive its connected stores.`;
+        modal.showModal();
+    });
+});
+
 document.querySelectorAll('[data-key-workflow]').forEach(form => {
     form.addEventListener('submit', async event => {
         event.preventDefault();
