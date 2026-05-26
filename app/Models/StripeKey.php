@@ -103,6 +103,71 @@ final class StripeKey
         db()->prepare('DELETE FROM stripe_keys WHERE id=?')->execute([$id]);
     }
 
+    public static function assignReadyKeyToUnassignedStore(int $storeId): ?array
+    {
+        $pdo = db();
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            $store = $pdo->prepare('SELECT stripe_key_id FROM stores WHERE id=? AND status IN ("active", "syncing") FOR UPDATE');
+            $store->execute([$storeId]);
+            $currentKeyId = $store->fetchColumn();
+            if ($currentKeyId !== false && $currentKeyId !== null) {
+                if ($ownsTransaction) {
+                    $pdo->commit();
+                }
+                return null;
+            }
+
+            if ($currentKeyId === false) {
+                if ($ownsTransaction) {
+                    $pdo->commit();
+                }
+                return null;
+            }
+
+            $available = $pdo->query('
+                SELECT id, company_name
+                FROM stripe_keys
+                WHERE status="active" AND workflow_status="ready"
+                ORDER BY target_started_at ASC, id ASC
+                LIMIT 1
+            ')->fetch();
+            if (!$available) {
+                if ($ownsTransaction) {
+                    $pdo->commit();
+                }
+                return null;
+            }
+
+            $assignment = $pdo->prepare('UPDATE stores SET stripe_key_id=?, updated_at=NOW() WHERE id=? AND stripe_key_id IS NULL');
+            $assignment->execute([(int) $available['id'], $storeId]);
+            if ($assignment->rowCount() !== 1) {
+                if ($ownsTransaction) {
+                    $pdo->commit();
+                }
+                return null;
+            }
+
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
+
+            return [
+                'id' => (int) $available['id'],
+                'company_name' => (string) $available['company_name'],
+            ];
+        } catch (\Throwable $exception) {
+            if ($ownsTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
+    }
+
     public static function automaticallyWaitForReachedTargets(?int $keyId = null): array
     {
         $sql = 'SELECT candidate.*

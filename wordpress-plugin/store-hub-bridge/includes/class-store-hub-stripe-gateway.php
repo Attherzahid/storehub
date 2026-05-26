@@ -109,7 +109,18 @@ final class Store_Hub_Suite_Stripe_Gateway extends WC_Payment_Gateway
 
     public function is_available(): bool
     {
-        return parent::is_available() && $this->secretKey !== '' && $this->getClient() !== null;
+        if (!parent::is_available()) {
+            return false;
+        }
+
+        if ($this->keySource === 'dashboard') {
+            $refresh = Store_Hub_Suite_Plugin::refreshPaymentKeys(false);
+            if ($refresh === true) {
+                $this->loadCredentials();
+            }
+        }
+
+        return $this->secretKey !== '' && $this->getClient() !== null;
     }
 
     public function admin_options()

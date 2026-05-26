@@ -57,6 +57,8 @@ Create a matching row in `store_connections` with `SHA2('your-token', 256)` and 
 
 Dashboard synchronization and the optional Stripe Checkout payment gateway operate independently. Configure payments in **WooCommerce > Settings > Payments > Store Hub Stripe Checkout**. Select **Manual keys entered below** to manage keys in WordPress, or **Dashboard managed assignment** to securely use the ready key assigned to the store in Store Hub. If the separate Stripe payment plugin was already configured, the combined plugin imports those gateway settings once when activated.
 
+The combined gateway is available in classic WooCommerce checkout and the Checkout Block once enabled. When a connected active store has no Stripe key assigned, its next sync or dashboard-key refresh automatically assigns an active ready key. Ready keys can serve multiple stores, while any existing store assignment remains unchanged until you update it or replace a waiting key.
+
 ## Security Notes
 
 - Admin writes use CSRF tokens.

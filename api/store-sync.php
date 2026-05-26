@@ -46,14 +46,22 @@ try {
     }
 
     $pausedKeys = $stripeKeyId ? StripeKey::automaticallyWaitForReachedTargets((int) $stripeKeyId) : [];
+    $assignedKey = StripeKey::assignReadyKeyToUnassignedStore($storeId);
     log_activity('WooCommerce store synced', 'sync');
     if ($pausedKeys) {
         log_activity('Stripe key automatically moved to payout waiting after approaching its sales target', 'stripe');
     }
+    if ($assignedKey) {
+        log_activity('Ready Stripe key automatically assigned to a connected store', 'stripe');
+    }
     $pdo->commit();
-    json_response(['message' => $pausedKeys
+    $message = $pausedKeys
         ? 'Store synced. Its Stripe key is now waiting for payout after approaching the sales target.'
-        : 'Store synced']);
+        : 'Store synced';
+    if ($assignedKey) {
+        $message .= ' A ready Stripe key was automatically assigned.';
+    }
+    json_response(['message' => $message]);
 } catch (Throwable $exception) {
     $pdo->rollBack();
     json_response(['error' => 'Sync failed'], 422);

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\StripeKey;
+
 require __DIR__ . '/_bootstrap.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
@@ -10,6 +12,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 
 $connection = require_api_token();
 throttle_api('store-key:' . $connection['id']);
+$assignedKey = StripeKey::assignReadyKeyToUnassignedStore((int) $connection['store_id']);
+if ($assignedKey) {
+    log_activity('Ready Stripe key automatically assigned to a connected store', 'stripe');
+}
 
 $stmt = db()->prepare('
     SELECT k.id, k.company_name, k.public_key, k.secret_key_encrypted

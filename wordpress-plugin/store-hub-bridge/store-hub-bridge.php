@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Store Hub Bridge and Stripe Payments
  * Description: Secure Store Hub dashboard sync and an optional Stripe Checkout gateway for WooCommerce.
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Store Hub
  * Requires PHP: 8.0
  * Text Domain: store-hub-bridge
@@ -14,6 +14,7 @@ if (!defined('ABSPATH')) {
 
 defined('STORE_HUB_BRIDGE_PLUGIN_FILE') || define('STORE_HUB_BRIDGE_PLUGIN_FILE', __FILE__);
 defined('STORE_HUB_BRIDGE_PLUGIN_DIR') || define('STORE_HUB_BRIDGE_PLUGIN_DIR', plugin_dir_path(__FILE__));
+defined('STORE_HUB_BRIDGE_PLUGIN_URL') || define('STORE_HUB_BRIDGE_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 final class Store_Hub_Suite_Plugin
 {
@@ -454,3 +455,14 @@ add_action('plugins_loaded', static function (): void {
         (new Store_Hub_Suite_Stripe_Gateway())->handleReturn();
     });
 }, 11);
+
+add_action('woocommerce_blocks_loaded', static function (): void {
+    if (!class_exists('\Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType')) {
+        return;
+    }
+
+    require_once STORE_HUB_BRIDGE_PLUGIN_DIR . 'includes/class-store-hub-stripe-blocks.php';
+    add_action('woocommerce_blocks_payment_method_type_registration', static function ($registry): void {
+        $registry->register(new Store_Hub_Suite_Stripe_Blocks());
+    });
+});
