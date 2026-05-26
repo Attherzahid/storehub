@@ -1,21 +1,22 @@
-# Store Hub Bridge and Stripe Payments
+# Store Hub Bridge
 
-One WooCommerce plugin with two independent modules:
+This is a companion plugin for Store Hub and the existing **Nana'Gs Stripe** WooCommerce gateway.
 
-- Store Hub synchronization sends order and revenue data to the dashboard.
-- Store Hub Stripe Checkout optionally accepts payments through Stripe Checkout.
-
-The official Stripe PHP SDK is bundled in the plugin archive and remains the payment-processing client.
+- Store Hub Bridge sends order and revenue data to the dashboard.
+- Store Hub Bridge retrieves the ready key assigned to this store and copies it into the existing Stripe plugin's manual key fields.
+- Nana'Gs Stripe remains unchanged and continues handling Stripe Checkout, webhooks, and payment completion.
 
 ## Install
 
-1. Upload and activate this plugin in WordPress.
-2. Open **Settings > Store Hub** to enable dashboard synchronization, enter the dashboard sync endpoint and token, and test **Sync now**.
-3. Open **WooCommerce > Settings > Payments > Store Hub Stripe Checkout** to enable Stripe payments and enter Stripe keys.
-4. Create a Stripe webhook endpoint for:
+1. Keep your working **Nana'Gs Stripe** plugin installed and active.
+2. Upload and activate **Store Hub Bridge** in WordPress.
+3. Open **Settings > Store Hub**, enter the dashboard sync endpoint and token, and enable automatic copying of assigned keys.
+4. Click **Sync now** or **Get assigned key and apply to Stripe Payment**.
+5. Open **WooCommerce > Settings > Payments > Stripe Checkout** to confirm the assigned manual keys are populated and enable your existing gateway.
+6. Continue using the existing Stripe webhook endpoint from your Stripe Payment plugin:
 
 ```text
-https://your-store.example/?wc-api=store_hub_stripe_webhook
+https://your-store.example/?wc-api=spwc_stripe_webhook
 ```
 
 Subscribe the endpoint to:
@@ -25,16 +26,12 @@ checkout.session.completed
 payment_intent.payment_failed
 ```
 
-Then enter its signing secret in the payment gateway settings.
+Store Hub does not change or replace the webhook signing secret.
 
-## Independent Operation
+## Key Updates
 
-- Turning off dashboard synchronization does not disable Stripe checkout payments.
-- Leaving Stripe Checkout disabled does not stop Store Hub synchronization.
-- In **Manual keys entered below** mode, Stripe Checkout uses the keys saved in the WooCommerce gateway settings.
-- In **Dashboard managed assignment** mode, the plugin obtains the currently assigned ready key from Store Hub over HTTPS immediately before starting each payment.
+- Your original Stripe payment source and checkout flow are not modified by this bridge.
+- The bridge writes credentials into `woocommerce_spwc_stripe_settings`, the same manual settings already used by Nana'Gs Stripe.
+- Test keys populate the test fields and enable test mode; live keys populate the live fields and disable test mode.
 - When an active store does not yet have any key attached, Store Hub automatically assigns an active ready key during sync or the first key refresh. A key may be assigned to multiple stores; an existing store assignment is never replaced automatically.
-- If a dashboard-managed key becomes payout waiting and no replacement key is assigned, new checkout payments are stopped instead of using that waiting key.
-- The gateway supports both the classic WooCommerce checkout and the Checkout Block. Enable **Store Hub Stripe Checkout** under **WooCommerce > Settings > Payments** before it can appear to customers.
-- If the separate `spwc_stripe` Stripe plugin was configured before activation, this plugin imports its settings once into the new gateway configuration.
-- The new payment gateway ID and webhook endpoint are unique, so both plugins can temporarily remain installed while testing. Disable the old Stripe payment gateway once the Store Hub gateway is confirmed working to avoid showing two Stripe options at checkout.
+- Refreshing the assigned key updates only the normal Stripe key/mode fields; your gateway enable setting, display text, and webhook signing secret remain intact.

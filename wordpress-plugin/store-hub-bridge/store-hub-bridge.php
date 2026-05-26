@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Store Hub Bridge and Stripe Payments
- * Description: Secure Store Hub dashboard sync and an optional Stripe Checkout gateway for WooCommerce.
- * Version: 1.1.2
+ * Plugin Name: Store Hub Bridge
+ * Description: Secure Store Hub dashboard sync and assigned-key updates for the existing Nana'Gs Stripe gateway.
+ * Version: 1.2.0
  * Author: Store Hub
  * Requires PHP: 8.0
  * Text Domain: store-hub-bridge
@@ -14,7 +14,6 @@ if (!defined('ABSPATH')) {
 
 defined('STORE_HUB_BRIDGE_PLUGIN_FILE') || define('STORE_HUB_BRIDGE_PLUGIN_FILE', __FILE__);
 defined('STORE_HUB_BRIDGE_PLUGIN_DIR') || define('STORE_HUB_BRIDGE_PLUGIN_DIR', plugin_dir_path(__FILE__));
-defined('STORE_HUB_BRIDGE_PLUGIN_URL') || define('STORE_HUB_BRIDGE_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 final class Store_Hub_Suite_Plugin
 {
@@ -23,6 +22,8 @@ final class Store_Hub_Suite_Plugin
     private const OPTION_TOKEN = 'store_hub_token';
     private const OPTION_LOGS = 'store_hub_sync_logs';
     private const OPTION_PAYMENT_KEYS = 'store_hub_payment_keys';
+    private const OPTION_APPLY_PAYMENT_KEYS = 'store_hub_apply_spwc_keys';
+    private const SPWC_SETTINGS = 'woocommerce_spwc_stripe_settings';
     private const CRON_HOOK = 'store_hub_sync_event';
 
     public function __construct()
@@ -38,7 +39,6 @@ final class Store_Hub_Suite_Plugin
         if (!get_option(self::OPTION_TOKEN)) {
             update_option(self::OPTION_TOKEN, wp_generate_password(48, false, false));
         }
-        self::importLegacyStripeSettings();
         if (!wp_next_scheduled(self::CRON_HOOK)) {
             wp_schedule_event(time() + 300, 'store_hub_fifteen_minutes', self::CRON_HOOK);
         }
@@ -47,18 +47,6 @@ final class Store_Hub_Suite_Plugin
     public static function deactivate(): void
     {
         wp_clear_scheduled_hook(self::CRON_HOOK);
-    }
-
-    private static function importLegacyStripeSettings(): void
-    {
-        if (get_option('woocommerce_store_hub_stripe_settings', null) !== null) {
-            return;
-        }
-
-        $legacy = get_option('woocommerce_spwc_stripe_settings', []);
-        if (is_array($legacy) && $legacy) {
-            add_option('woocommerce_store_hub_stripe_settings', $legacy, '', false);
-        }
     }
 
     public function schedules(array $schedules): array
@@ -78,6 +66,7 @@ final class Store_Hub_Suite_Plugin
     public function settings(): void
     {
         register_setting('store_hub_bridge', self::OPTION_SYNC_ENABLED, ['sanitize_callback' => [$this, 'sanitizeCheckbox']]);
+        register_setting('store_hub_bridge', self::OPTION_APPLY_PAYMENT_KEYS, ['sanitize_callback' => [$this, 'sanitizeCheckbox']]);
         register_setting('store_hub_bridge', self::OPTION_ENDPOINT, ['sanitize_callback' => 'esc_url_raw']);
         register_setting('store_hub_bridge', self::OPTION_TOKEN, ['sanitize_callback' => 'sanitize_text_field']);
     }
@@ -103,7 +92,7 @@ final class Store_Hub_Suite_Plugin
         if (isset($_POST['store_hub_refresh_payment_key']) && check_admin_referer('store_hub_refresh_payment_key')) {
             $result = self::refreshPaymentKeys(true);
             if ($result === true) {
-                echo '<div class="notice notice-success"><p>Dashboard payment key refreshed.</p></div>';
+                echo '<div class="notice notice-success"><p>Assigned Store Hub key copied into the Nana&apos;Gs Stripe manual key settings.</p></div>';
             } else {
                 echo '<div class="notice notice-error"><p>' . esc_html($result) . '</p></div>';
             }
@@ -124,6 +113,14 @@ final class Store_Hub_Suite_Plugin
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row">Stripe manual keys</th>
+                        <td>
+                            <input type="hidden" name="<?php echo esc_attr(self::OPTION_APPLY_PAYMENT_KEYS); ?>" value="no">
+                            <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_APPLY_PAYMENT_KEYS); ?>" value="yes" <?php checked($this->paymentKeySyncEnabled(), true); ?>> Automatically copy the assigned Store Hub key into Nana'Gs Stripe manual key fields after sync</label>
+                            <p class="description">Your Stripe payment plugin remains responsible for checkout. Store Hub only updates its saved manual credentials.</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="<?php echo esc_attr(self::OPTION_ENDPOINT); ?>">Dashboard sync endpoint</label></th>
                         <td><input class="regular-text" id="<?php echo esc_attr(self::OPTION_ENDPOINT); ?>" name="<?php echo esc_attr(self::OPTION_ENDPOINT); ?>" value="<?php echo esc_attr(get_option(self::OPTION_ENDPOINT)); ?>" placeholder="https://example.com/store-hub/api/store-sync.php"></td>
                     </tr>
@@ -141,14 +138,14 @@ final class Store_Hub_Suite_Plugin
             <h2>Sync log</h2>
             <?php $this->renderLogs(); ?>
             <hr>
-            <h2>Stripe payments</h2>
-            <p>The optional payment gateway is configured separately in <a href="<?php echo esc_url(admin_url('admin.php?page=wc-settings&tab=checkout&section=store_hub_stripe')); ?>">WooCommerce &gt; Settings &gt; Payments &gt; Store Hub Stripe Checkout</a>. Dashboard sync can be disabled without disabling checkout payments.</p>
+            <h2>Nana'Gs Stripe keys</h2>
+            <p>Your existing Stripe plugin continues handling all payments. Store Hub can only populate its existing manual key fields in <a href="<?php echo esc_url(admin_url('admin.php?page=wc-settings&tab=checkout&section=spwc_stripe')); ?>">WooCommerce &gt; Settings &gt; Payments &gt; Stripe Checkout</a>.</p>
             <?php if (is_array($paymentKeys) && !empty($paymentKeys['company_name'])): ?>
-                <p>Dashboard-assigned key: <strong><?php echo esc_html($paymentKeys['company_name']); ?></strong> <code><?php echo esc_html($this->maskKey((string) ($paymentKeys['public_key'] ?? ''))); ?></code> refreshed <?php echo esc_html((string) ($paymentKeys['synced_at'] ?? '')); ?>.</p>
+                <p>Last applied key: <strong><?php echo esc_html($paymentKeys['company_name']); ?></strong> <code><?php echo esc_html($this->maskKey((string) ($paymentKeys['public_key'] ?? ''))); ?></code> applied <?php echo esc_html((string) ($paymentKeys['synced_at'] ?? '')); ?>.</p>
             <?php endif; ?>
             <form method="post">
                 <?php wp_nonce_field('store_hub_refresh_payment_key'); ?>
-                <p><button class="button button-secondary" name="store_hub_refresh_payment_key" value="1">Refresh assigned payment key</button></p>
+                <p><button class="button button-secondary" name="store_hub_refresh_payment_key" value="1">Get assigned key and apply to Stripe Payment</button></p>
             </form>
         </div>
         <?php
@@ -228,7 +225,7 @@ final class Store_Hub_Suite_Plugin
         }
 
         self::addLog('success', 'Synced ' . count($payloadOrders) . ' recent orders.', $endpoint, $statusCode);
-        if (self::usesDashboardPaymentKeys()) {
+        if ($this->paymentKeySyncEnabled()) {
             self::refreshPaymentKeys(true);
         }
         return true;
@@ -239,7 +236,7 @@ final class Store_Hub_Suite_Plugin
         $endpoint = esc_url_raw((string) get_option(self::OPTION_ENDPOINT));
         $token = sanitize_text_field((string) get_option(self::OPTION_TOKEN));
         if (!$endpoint || !$token) {
-            return 'Store Hub endpoint and API token are required before dashboard payment keys can be used.';
+            return 'Store Hub endpoint and API token are required before Stripe keys can be retrieved.';
         }
 
         $stored = get_option(self::OPTION_PAYMENT_KEYS, []);
@@ -252,7 +249,7 @@ final class Store_Hub_Suite_Plugin
             return 'The dashboard sync endpoint must end with /api/store-sync.php.';
         }
         if (wp_parse_url($keyEndpoint, PHP_URL_SCHEME) !== 'https') {
-            return 'Dashboard managed payment keys require an HTTPS dashboard endpoint.';
+            return 'Applying assigned payment keys requires an HTTPS dashboard endpoint.';
         }
 
         $response = wp_remote_get($keyEndpoint, [
@@ -286,14 +283,30 @@ final class Store_Hub_Suite_Plugin
             'synced_at' => current_time('mysql'),
             'synced_timestamp' => time(),
         ], false);
-        self::addLog('success', 'Payment key refreshed from dashboard assignment.', $keyEndpoint, $statusCode);
+        self::applyToStripePaymentManualFields($publicKey, $secretKey);
+        self::addLog('success', 'Assigned key copied into Nana\'Gs Stripe manual key settings.', $keyEndpoint, $statusCode);
         return true;
     }
 
-    public static function usesDashboardPaymentKeys(): bool
+    private static function applyToStripePaymentManualFields(string $publicKey, string $secretKey): void
     {
-        $settings = get_option('woocommerce_store_hub_stripe_settings', []);
-        return is_array($settings) && ($settings['key_source'] ?? 'manual') === 'dashboard';
+        $settings = get_option(self::SPWC_SETTINGS, []);
+        if (!is_array($settings)) {
+            $settings = [];
+        }
+
+        $isTest = str_starts_with($publicKey, 'pk_test_') || str_starts_with($secretKey, 'sk_test_') || str_starts_with($secretKey, 'rk_test_');
+        if ($isTest) {
+            $settings['testmode'] = 'yes';
+            $settings['test_publishable_key'] = $publicKey;
+            $settings['test_secret_key'] = $secretKey;
+        } else {
+            $settings['testmode'] = 'no';
+            $settings['live_publishable_key'] = $publicKey;
+            $settings['live_secret_key'] = $secretKey;
+        }
+
+        update_option(self::SPWC_SETTINGS, $settings, false);
     }
 
     private function renderLogs(): void
@@ -430,39 +443,13 @@ final class Store_Hub_Suite_Plugin
 
         return (bool) get_option(self::OPTION_ENDPOINT) && (bool) get_option(self::OPTION_TOKEN);
     }
+
+    private function paymentKeySyncEnabled(): bool
+    {
+        return get_option(self::OPTION_APPLY_PAYMENT_KEYS, 'yes') === 'yes';
+    }
 }
 
 register_activation_hook(__FILE__, ['Store_Hub_Suite_Plugin', 'activate']);
 register_deactivation_hook(__FILE__, ['Store_Hub_Suite_Plugin', 'deactivate']);
 new Store_Hub_Suite_Plugin();
-
-add_action('plugins_loaded', static function (): void {
-    if (!class_exists('WC_Payment_Gateway')) {
-        return;
-    }
-
-    require_once STORE_HUB_BRIDGE_PLUGIN_DIR . 'includes/class-store-hub-stripe-gateway.php';
-
-    add_filter('woocommerce_payment_gateways', static function (array $gateways): array {
-        $gateways[] = 'Store_Hub_Suite_Stripe_Gateway';
-        return $gateways;
-    });
-
-    add_action('woocommerce_api_store_hub_stripe_webhook', static function (): void {
-        (new Store_Hub_Suite_Stripe_Gateway())->handleWebhook();
-    });
-    add_action('woocommerce_api_store_hub_stripe_return', static function (): void {
-        (new Store_Hub_Suite_Stripe_Gateway())->handleReturn();
-    });
-}, 11);
-
-add_action('woocommerce_blocks_loaded', static function (): void {
-    if (!class_exists('\Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType')) {
-        return;
-    }
-
-    require_once STORE_HUB_BRIDGE_PLUGIN_DIR . 'includes/class-store-hub-stripe-blocks.php';
-    add_action('woocommerce_blocks_payment_method_type_registration', static function ($registry): void {
-        $registry->register(new Store_Hub_Suite_Stripe_Blocks());
-    });
-});

@@ -55,9 +55,9 @@ https://storehub.orpixia.com/api/store-sync.php
 
 Create a matching row in `store_connections` with `SHA2('your-token', 256)` and paste the plain token into the plugin settings.
 
-Dashboard synchronization and the optional Stripe Checkout payment gateway operate independently. Configure payments in **WooCommerce > Settings > Payments > Store Hub Stripe Checkout**. Select **Manual keys entered below** to manage keys in WordPress, or **Dashboard managed assignment** to securely use the ready key assigned to the store in Store Hub. If the separate Stripe payment plugin was already configured, the combined plugin imports those gateway settings once when activated.
+Store Hub Bridge is a companion to the existing **Nana'Gs Stripe** plugin. It does not implement or replace checkout payments. When enabled in **Settings > Store Hub**, it retrieves the ready key assigned by the dashboard and fills the standard manual key fields already read by **WooCommerce > Settings > Payments > Stripe Checkout**. Test assignments populate test keys and test mode; live assignments populate live keys and live mode. Webhook settings and the payment process remain owned by the Stripe plugin.
 
-The combined gateway is available in classic WooCommerce checkout and the Checkout Block once enabled. When a connected active store has no Stripe key assigned, its next sync or dashboard-key refresh automatically assigns an active ready key. Ready keys can serve multiple stores, while any existing store assignment remains unchanged until you update it or replace a waiting key.
+When a connected active store has no Stripe key assigned, its next sync or assigned-key refresh automatically assigns an active ready key. Ready keys can serve multiple stores, while an existing store assignment remains unchanged until you update it or replace a waiting key.
 
 ## Security Notes
 
